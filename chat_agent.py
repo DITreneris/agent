@@ -179,6 +179,46 @@ def run_ollama_audit(prompt: str) -> str:
 
     return data["message"]["content"]
 
+
+def run_selected_code_audit(
+    file_name: str,
+    audit_target: str,
+    start_line: int,
+    end_line: int,
+    selected_content: str,
+) -> str:
+    full_prompt = build_file_audit_prompt(
+        audit_target,
+        selected_content,
+    )
+
+    validated_result = run_validated_audit(
+        initial_prompt=full_prompt,
+        model_call=run_ollama_audit,
+    )
+
+    if not validated_result.success:
+        error_details = "\n".join(
+            f"- {error}"
+            for error in validated_result.errors
+        )
+
+        return (
+            "Audit output rejected after one retry.\n"
+            f"{error_details}"
+        )
+
+    audit_id = create_audit_result(
+        file_path=file_name,
+        start_line=start_line,
+        end_line=end_line,
+        response=validated_result.response,
+        retry_used=validated_result.retry_used,
+    )
+
+    return f"{validated_result.response}\n\nAudit saved: #{audit_id}"
+
+
 def handle_memory_command(user_input: str):
     text = user_input.strip()
 
@@ -454,36 +494,13 @@ def handle_memory_command(user_input: str):
             f"lines {start_line}-{end_line}"
         )
 
-        full_prompt = build_file_audit_prompt(
-            audit_target,
-            selected_content,
-        )
-
-        validated_result = run_validated_audit(
-            initial_prompt=full_prompt,
-            model_call=run_ollama_audit,
-        )
-
-        if not validated_result.success:
-            error_details = "\n".join(
-                f"- {error}"
-                for error in validated_result.errors
-            )
-
-            return (
-                "Audit output rejected after one retry.\n"
-                f"{error_details}"
-            )
-
-        audit_id = create_audit_result(
-            file_path=file_name,
+        return run_selected_code_audit(
+            file_name=file_name,
+            audit_target=audit_target,
             start_line=start_line,
             end_line=end_line,
-            response=validated_result.response,
-            retry_used=validated_result.retry_used,
+            selected_content=selected_content,
         )
-
-        return f"{validated_result.response}\n\nAudit saved: #{audit_id}"
 
     if text.startswith("/audit_lines"):
         arguments = text.removeprefix("/audit_lines").strip().split()
@@ -538,37 +555,15 @@ def handle_memory_command(user_input: str):
         )
 
         audit_target = f"{file_name}, lines {start_line}-{end_line}"
-        full_prompt = build_file_audit_prompt(
-            audit_target,
-            selected_content,
-        )
 
-        validated_result = run_validated_audit(
-            initial_prompt=full_prompt,
-            model_call=run_ollama_audit,
-        )
-
-
-        if not validated_result.success:
-            error_details = "\n".join(
-                f"- {error}"
-                for error in validated_result.errors
-            )
-
-            return (
-                "Audit output rejected after one retry.\n"
-                f"{error_details}"
-            )
-
-        audit_id = create_audit_result(
-            file_path=file_name,
+        return run_selected_code_audit(
+            file_name=file_name,
+            audit_target=audit_target,
             start_line=start_line,
             end_line=end_line,
-            response=validated_result.response,
-            retry_used=validated_result.retry_used,
+            selected_content=selected_content,
         )
 
-        return f"{validated_result.response}\n\nAudit saved: #{audit_id}"
 
     if text.startswith("/audit_file"):
         file_name = text.removeprefix("/audit_file").strip()

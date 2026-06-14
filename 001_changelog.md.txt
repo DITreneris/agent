@@ -1,0 +1,1434 @@
+# Changelog
+
+## 2026-06-14 — v1.2 Shared Audit Execution Refactor
+
+### Changed
+
+- Extracted shared validated audit execution logic into `run_selected_code_audit()`.
+- Updated `/audit_function` to reuse the shared audit execution path.
+- Updated `/audit_lines` to reuse the shared audit execution path.
+- Reduced duplicated audit flow logic between function-based and line-based audits.
+- Preserved existing validation, retry, and SQLite persistence behavior.
+
+### Verified
+
+- Confirmed `chat_agent.py` compiles.
+- Confirmed full test suite passes:
+
+```text
+27 passed, 1 warning
+```
+
+- Confirmed `/audit_function prompt_builder.py build_file_audit_prompt` works in real CLI run.
+- Confirmed function-based audit result saved as `#5`.
+- Confirmed `/audit_lines prompt_builder.py 84 158` works in real CLI run.
+- Confirmed line-based audit result saved as `#6`.
+- Confirmed `/audit_history 5` shows both new audit results.
+- Confirmed `/audit_stats` updates total audits to 6.
+
+### Known Limitations
+
+- `/audit_file` still uses its legacy audit flow and was intentionally left unchanged.
+- `/audit_function` still supports only top-level Python functions and async functions.
+- Class methods remain out of scope for this release.
+- Duplicate function names in nested scopes remain out of scope.
+
+### Next Priority
+
+Stop after commit.
+
+## 2026-06-14 — v1.1 Function-Aware Chunking MVP
+
+### Added
+
+- Added `code_chunker.py` with AST-based function range detection.
+- Added `/audit_function <path> <function_name>` CLI command.
+- Added support for auditing Python functions by name instead of manually selecting line ranges.
+- Added regression tests for:
+  - regular function detection;
+  - async function detection;
+  - missing function handling;
+  - syntax error handling.
+
+### Changed
+
+- Updated `/help` to include `/audit_function`.
+- Reused the existing validated audit flow and SQLite persistence path.
+
+### Verified
+
+- Confirmed `code_chunker.py` compiles.
+- Confirmed `chat_agent.py` compiles.
+- Confirmed full test suite passes:
+
+```text
+27 passed, 1 warning
+
+Confirmed /audit_function prompt_builder.py build_file_audit_prompt works in real CLI run.
+Confirmed audit result saved as #4.
+Confirmed /audit_history 5 shows the new function-based audit.
+Confirmed /audit_stats updates total audits to 4.
+Current Status
+
+### v1.1 Function-Aware Chunking MVP is operational.
+
+The project can now audit specific Python functions without manual line-range calculation:
+
+/audit_function <path> <function_name>
+Known Limitations
+Currently supports top-level Python functions and async functions.
+Does not yet support class methods.
+Does not yet handle duplicate function names in nested scopes.
+/audit_function currently duplicates some /audit_lines audit flow logic.
+Next Priority
+
+Do not add new features immediately.
+
+Recommended next step: small refactor in v1.2 to extract shared audit execution logic from /audit_lines and /audit_function.
+
+
+## Mano siūlymas
+
+Šiandien **stop** po commit ir changelog.  
+v1.2 tegul būna mažas refactor, ne naujas feature.
+
+
+## 2026-06-14 — v1.0 Audit Usefulness Hardening
+
+### Added
+
+- Added stricter audit usefulness rules to `build_file_audit_prompt()`.
+- Added practical failure-mode requirement for focused code audits.
+- Added anti-generic approval guidance.
+- Added clearer distinction between verified defects, non-blocking risks, assumptions, and future improvements.
+- Added stronger verdict guidance for:
+  - `GO`
+  - `GO_WITH_NOTES`
+  - `BLOCK`
+- Added prompt-builder regression tests:
+  - audit prompt includes usefulness rules;
+  - audit prompt includes verdict guidance;
+  - audit prompt preserves special characters in file content.
+
+### Changed
+
+- Improved `/audit_lines` audit quality without changing the CLI workflow.
+- Reduced likelihood of overly soft `GO` verdicts when practical risks are visible.
+- Improved audit output usefulness for maintainability, edge-case, CLI workflow, and context-window risks.
+- Kept validator verdict set unchanged to avoid unnecessary compatibility risk.
+
+### Verified
+
+- Confirmed full test suite passes:
+
+```text
+23 passed, 1 warning
+
+
+## 2026-06-13 — v0.9 Audit Stats
+
+### Added
+
+* Added `get_audit_stats()` to `memory_store.py`.
+* Added `/audit_stats` CLI command.
+* Added audit statistics output showing:
+
+  * total saved audits;
+  * verdict counts;
+  * retries used;
+  * most audited file.
+* Updated `/help` with:
+
+```text
+/audit_stats
+```
+
+* Updated the unknown-command help list to include current audit commands.
+* Added regression tests:
+
+  * `test_get_audit_stats_empty_database`
+  * `test_get_audit_stats_counts_saved_audits`
+
+### Verified
+
+* Confirmed `get_audit_stats()` works against the real local database.
+* Confirmed `/audit_stats` works in a real CLI run.
+* Confirmed `/audit_history 5` still works after the new command was added.
+* Confirmed memory-store tests pass:
+
+```text
+4 passed
+```
+
+* Confirmed full test suite passes:
+
+```text
+20 passed, 1 warning
+```
+
+### Current Status
+
+v0.9 audit stats core is operational.
+
+The project can now complete the audit feedback loop:
+
+```text
+select code block
+→ run local audit
+→ validate structured output
+→ retry once if invalid
+→ persist accepted result
+→ retrieve recent audit history
+→ summarize saved audit results
+```
+
+### Known Limitations
+
+* `/audit_stats` currently provides only global summary statistics.
+* No stats filtering by file yet.
+* No date-based stats yet.
+* No audit-history pagination yet.
+* No project-wide audit aggregation yet.
+* Remaining warning comes from external `pydantic_ai`, not project code:
+
+```text
+DeprecationWarning: There is no current event loop
+```
+
+### Next Priority
+
+Do not expand reporting too early.
+
+Recommended next step: collect more real audit results first, then decide whether v1.0 should focus on:
+
+```text
+audit usefulness improvement
+```
+
+or:
+
+```text
+function-aware chunking
+```
+
+### Do Not Do Yet
+
+* Do not add embeddings.
+* Do not add RAG.
+* Do not add multi-agent orchestration.
+* Do not build dashboards.
+* Do not add complex filtering before there are enough saved audit results.
+* Do not expand `/audit_file` persistence yet.
+
+
+
+
+
+## 2026-06-12 — v0.8 Audit History and Basic Reporting Core
+
+### Added
+
+* Added `get_recent_audit_results(limit: int = 10)` to `memory_store.py`.
+* Added `/audit_history` CLI command.
+* Added optional limit support:
+
+```text
+/audit_history 5
+```
+
+* Updated `/help` with:
+
+```text
+/audit_history [limit]
+```
+
+* Added regression test:
+
+```text
+test_get_recent_audit_results_returns_latest_first
+```
+
+### Changed
+
+* Improved CLI exit handling by applying `.strip()` to user input before checking:
+
+```text
+exit
+quit
+```
+
+* Replaced deprecated UTC datetime usage:
+
+```python
+datetime.utcnow()
+```
+
+with timezone-aware:
+
+```python
+datetime.now(UTC)
+```
+
+### Verified
+
+* Confirmed `/audit_history` works in real CLI run.
+* Confirmed `/audit_history 5` works in real CLI run.
+* Confirmed `/help` displays the new command.
+* Confirmed audit history output shows saved audit result:
+
+```text
+#1 | GO_WITH_NOTES | confidence: High | chat_agent.py:339-397 | retry: false | 2026-06-11T14:02:13.776796
+```
+
+* Confirmed memory-store tests pass:
+
+```text
+2 passed
+```
+
+* Confirmed full test suite passes:
+
+```text
+18 passed, 1 warning
+```
+
+### Current Status
+
+v0.8 audit history core is operational.
+
+The project can now complete the minimum useful audit loop:
+
+```text
+select code block
+→ run local audit
+→ validate structured output
+→ retry once if invalid
+→ persist accepted result
+→ retrieve recent audit history through CLI
+```
+
+### Known Limitations
+
+* `/audit_history` currently supports only basic recent-result listing.
+* No `/audit_stats` command yet.
+* No filtering by file yet.
+* No audit-history pagination yet.
+* Remaining warning comes from external `pydantic_ai`, not project code:
+
+```text
+DeprecationWarning: There is no current event loop
+```
+
+### Next Priority
+
+Add a small `/audit_stats` command only after confirming that `/audit_history` remains stable.
+
+Recommended minimum scope for next step:
+
+```text
+/audit_stats
+```
+
+Possible output:
+
+```text
+Total audits: 12
+GO: 5
+GO_WITH_NOTES: 4
+FIX: 3
+Retries used: 2
+```
+
+### Do Not Do Yet
+
+* Do not add embeddings.
+* Do not add RAG.
+* Do not add multi-agent orchestration.
+* Do not expand `/audit_file` persistence yet.
+* Do not build dashboards.
+* Do not overbuild audit filtering before there are enough saved audit results.
+
+
+
+## 2026-06-11 — v0.7 Audit Result Persistence Core
+
+### Added
+
+- Added `audit_results` table to `memory.db`.
+- Added `create_audit_result()` to persist accepted audit responses.
+- Added verdict and confidence extraction from validated seven-section audit output.
+- Integrated audit persistence into `/audit_lines`.
+- Added audit save confirmation with `Audit saved: #<id>`.
+- Added `test_memory_store.py`.
+
+### Verified
+
+- `python -m py_compile memory_store.py`
+- `python -m py_compile chat_agent.py`
+- `python -m pytest`
+- Confirmed 17 tests pass.
+- Confirmed real `/audit_lines chat_agent.py 339 397` saves audit result as `#1`.
+- Confirmed DB row contains `file_path`, `start_line`, `end_line`, `verdict`, `confidence`, `retry_used`, and `created_at`.
+
+### Current status
+
+v0.7 persistence core is operational.
+
+### Known limitations
+
+- Audit result persistence is currently implemented only for `/audit_lines`.
+- No `/audit_history` command yet.
+- No `/audit_stats` command yet.
+- `datetime.utcnow()` produces a deprecation warning on Python 3.12+.
+
+### Next priority
+
+Add a simple `/audit_history` command showing the latest 5–10 saved audit results.
+
+## 2026-06-09 — v0.6 Structured Audit Output Validation
+
+### Added
+
+- Added `audit_validator.py`.
+- Added deterministic validation for the seven-section audit contract.
+- Added checks for missing, duplicate, empty, misordered, and forbidden content.
+- Added `audit_runner.py`.
+- Added one automatic repair retry for invalid model output.
+- Added clear rejection after a failed retry.
+- Integrated validated audit execution into `/audit_lines`.
+- Aligned `prompt_builder.py`, `audit_validator.py`, and `audit_runner.py` to the same seven-section contract.
+
+### Tests
+
+- Added 12 validator tests.
+- Added 4 retry workflow tests.
+- Confirmed all 16 tests pass.
+- Confirmed `/audit_lines` returns a valid seven-section response in a real Ollama run.
+
+### Current status
+
+v0.6 core implementation is operational.
+
+### Known limitation
+
+The model may still produce theoretical or low-value pitfalls even when the final verdict is `GO`.
+
+### Next priority
+
+Persist accepted audit results and measure retry frequency before improving model judgment quality.
+
+## 2026-06-09 — `/audit_lines` Regression Validation Completed
+
+### Goal
+
+Complete the full regression test suite for `/audit_lines`, confirm that the command handler behaves correctly across invalid and boundary inputs, and determine whether any further handler changes are justified.
+
+### Verified
+
+The following syntax and runtime checks passed:
+
+* `python -m py_compile chat_agent.py`
+* `python -m py_compile prompt_builder.py`
+* `python chat_agent.py`
+
+The application started successfully and `/help` displayed all expected commands, including:
+
+* `/audit_file <path>`
+* `/audit_lines <path> <start> <end>`
+
+`/project_summary` also executed successfully and confirmed that 8 project files are currently indexed:
+
+* `agent.py`
+* `chat_agent.py`
+* `memory_store.py`
+* `project_config.py`
+* `project_context.py`
+* `project_scanner.py`
+* `prompt_builder.py`
+* `test_gemma4.py`
+
+### Full Function Audit
+
+Executed:
+
+`/audit_lines chat_agent.py 339 397`
+
+The command successfully audited the complete `/audit_lines` handler.
+
+The model returned `Go` and did not identify any blocking runtime, security, or workflow defect.
+
+The model again criticized the `end_line` capping logic, but this was confirmed to be a false positive because the current implementation intentionally allows the requested end line to exceed the real file length and safely caps it before slicing.
+
+No code change was made.
+
+### Regression Tests Completed
+
+The following 12 input validation scenarios were tested successfully.
+
+#### 1. Command without arguments
+
+Input:
+
+`/audit_lines`
+
+Result:
+
+`Usage: /audit_lines <path> <start> <end>`
+
+Status: PASS
+
+#### 2. Missing end line
+
+Input:
+
+`/audit_lines chat_agent.py 339`
+
+Result:
+
+`Usage: /audit_lines <path> <start> <end>`
+
+Status: PASS
+
+#### 3. Non-integer line number
+
+Input:
+
+`/audit_lines chat_agent.py abc 397`
+
+Result:
+
+`Line numbers must be integers.`
+
+Status: PASS
+
+#### 4. Zero start line
+
+Input:
+
+`/audit_lines chat_agent.py 0 20`
+
+Result:
+
+`Invalid line range.`
+
+Status: PASS
+
+#### 5. Negative start line
+
+Input:
+
+`/audit_lines chat_agent.py -5 20`
+
+Result:
+
+`Invalid line range.`
+
+Status: PASS
+
+#### 6. Reversed line range
+
+Input:
+
+`/audit_lines chat_agent.py 397 339`
+
+Result:
+
+`Invalid line range.`
+
+Status: PASS
+
+#### 7. Range above 200 lines
+
+Input:
+
+`/audit_lines chat_agent.py 1 250`
+
+Result:
+
+`Maximum audit range is 200 lines.`
+
+Status: PASS
+
+#### 8. Missing file
+
+Input:
+
+`/audit_lines missing.py 1 20`
+
+Result:
+
+`File not found: missing.py`
+
+Status: PASS
+
+#### 9. Path traversal attempt
+
+Input:
+
+`/audit_lines ../memory_store.py 1 20`
+
+Result:
+
+`Access denied: ../memory_store.py`
+
+Status: PASS
+
+#### 10. Directory instead of file
+
+Input:
+
+`/audit_lines __pycache__ 1 20`
+
+Result:
+
+`Path is not a file: __pycache__`
+
+Status: PASS
+
+#### 11. Start line beyond file length
+
+Input:
+
+`/audit_lines chat_agent.py 5000 5010`
+
+Result:
+
+`Start line exceeds file length: 528 lines`
+
+Status: PASS
+
+#### 12. End line beyond file length
+
+Input:
+
+`/audit_lines chat_agent.py 500 600`
+
+Result:
+
+The command safely capped the end line to the actual end of the file and audited lines 500–528.
+
+Status: PASS
+
+### Findings
+
+* All 12 regression tests passed.
+* `/audit_lines` command routing works correctly.
+* Argument validation works correctly.
+* Integer validation works correctly.
+* Invalid ranges are rejected.
+* The 200-line maximum is enforced.
+* Missing files are rejected.
+* Directory paths are rejected.
+* Path traversal attempts are blocked.
+* Start lines beyond the file length are rejected.
+* End lines beyond the file length are safely capped.
+* No empty or invalid code segment is sent to the model.
+* The `/audit_lines` handler no longer requires changes.
+
+### Important Interpretation
+
+The command handler is not the current bottleneck.
+
+The remaining weakness is model judgment quality.
+
+Even when the model correctly concludes that no blocking issue exists, it may still generate theoretical or low-value pitfalls such as:
+
+* possible future redundancy;
+* possible formatting degradation;
+* assumptions about external helper functions;
+* hypothetical maintainability concerns.
+
+These are not command failures and should not trigger code changes without visible evidence.
+
+### Current Status
+
+`/audit_lines` regression validation is complete.
+
+The command can now be treated as operational for focused code-segment audits.
+
+The following workflow is confirmed:
+
+`command input`
+→ `argument validation`
+→ `safe path validation`
+→ `file length validation`
+→ `line-range extraction`
+→ `local model audit`
+
+### Decision
+
+Do not modify the `/audit_lines` handler further.
+
+Further handler refactoring would currently be low ROI and would risk changing working behavior.
+
+The next highest-ROI improvement is structured audit output validation.
+
+### Next Step
+
+Implement a deterministic validation layer for model audit responses.
+
+The validator should check:
+
+* the response starts with `1. Bottom line`;
+* all seven required section headings are present;
+* forbidden phrases such as `Self-Correction` are absent;
+* no unexpected content appears before section 1;
+* the response ends after section 7;
+* invalid output is either retried once or rejected clearly.
+
+### Recommended Next Version
+
+**v0.6 — Structured Audit Output Validation**
+
+Target workflow:
+
+`/audit_lines`
+→ run local model
+→ validate the 7-section output contract
+→ retry once if invalid
+→ return only accepted output
+
+
+## 2026-06-08 — Reliable `/audit_lines` Validation and Prompt Hardening
+
+### Goal
+
+Validate the segmented audit workflow end to end, remove misleading prompt behavior, and close the main usability gaps in `/audit_lines`.
+
+### Changed
+
+* Simplified `build_file_audit_prompt()` in `prompt_builder.py`.
+* Removed outdated v0.5-specific instructions focused only on `/audit_file`.
+* Removed duplicated output-discipline rules.
+* Added clearer audit constraints:
+
+  * audit only the provided code;
+  * do not invent defects, missing functions, or dependencies;
+  * do not propose a patch unless a concrete defect is visible;
+  * do not repeat existing code as a proposed fix;
+  * treat imported functions as valid dependencies unless visibly broken;
+  * do not report theoretical or stylistic concerns as concrete defects without a failing path;
+  * use `No-go` only for visible runtime, security, or workflow-blocking defects.
+* Added explicit guidance that mapping 1-based user line numbers to 0-based Python list indexes is valid.
+* Updated the `/audit_lines` command handler so `/audit_lines` without arguments returns usage guidance instead of `Unknown command`.
+* Added the following commands to `/help`:
+
+  * `/audit_file <path>`
+  * `/audit_lines <path> <start> <end>`
+
+### Fixed
+
+* Fixed command matching from:
+
+  `if text.startswith("/audit_lines "):`
+
+  to:
+
+  `if text.startswith("/audit_lines"):`
+
+* Fixed argument parsing so the command works both with and without arguments.
+
+* Fixed the missing `/audit_lines` entry in the help output.
+
+* Fixed the missing `/audit_file` entry in the help output.
+
+### Verified
+
+* `python -m py_compile prompt_builder.py` passes.
+
+* `python -m py_compile chat_agent.py` passes.
+
+* Full `/audit_lines` implementation range was identified as lines 339–397.
+
+* `/audit_lines chat_agent.py 339 397` executes successfully.
+
+* `/audit_lines` without arguments returns:
+
+  `Usage: /audit_lines <path> <start> <end>`
+
+* Invalid reversed range returns:
+
+  `Invalid line range.`
+
+* Non-integer line input returns:
+
+  `Line numbers must be integers.`
+
+* Requests above the 200-line limit return:
+
+  `Maximum audit range is 200 lines.`
+
+* Missing files return:
+
+  `File not found: missing.py`
+
+* Path traversal attempts return:
+
+  `Access denied: ../memory_store.py`
+
+* Directory paths return:
+
+  `Path is not a file: __pycache__`
+
+* End lines beyond the file length are safely capped to the real file length.
+
+* `/help` now lists both audit commands.
+
+### Findings
+
+* The `/audit_lines` command logic is functioning correctly.
+* Earlier Gemma 4 claims about 1-based to 0-based indexing and `end_line` capping were false positives.
+* Prompt simplification removed visible `Self-Correction` output and stabilized the 7-section structure.
+* Gemma 4 can still generate weak or overly cautious criticism even when the visible code is correct.
+* Further prompt patching for every individual false positive would be low ROI.
+
+### Current Status
+
+* `/audit_lines` is operational and its input validation is well tested.
+* The command is safer and more usable than `/audit_file` for focused code review.
+* The command handler is no longer the main problem.
+* The remaining limitation is model judgment quality, not file reading, path validation, line handling, or command routing.
+* `/audit_file` remains experimental for larger files.
+
+### Tomorrow
+
+1. Run `/audit_lines` on two additional complete functions from different files.
+2. Compare whether Gemma 4 produces consistent findings across repeated runs.
+3. Add one simple deterministic post-validation layer for audit output:
+
+   * reject forbidden phrases such as `Self-Correction`;
+   * verify all seven section headings are present;
+   * verify the response starts with `1. Bottom line`;
+   * verify the response ends after section 7.
+4. Decide whether invalid audit output should:
+
+   * be retried once with a shorter repair prompt; or
+   * return a clear validation error.
+5. Do not start automatic segmentation, patch generation, AST detection, multi-file audit, RAG, or embeddings yet.
+
+### Recommended Next Version
+
+**v0.6 — Structured Audit Output Validation**
+
+Primary goal:
+
+`/audit_lines`
+→ run local model
+→ validate output contract
+→ retry once or fail clearly
+→ return only accepted audit output
+
+This is the highest-ROI next step because the command workflow now works, while model output reliability remains the main unresolved risk.
+
+
+## 2026-06-07 — Segmented Code Audit MVP
+
+### Goal
+
+Stabilize Gemma 4 code auditing and reduce hallucinations caused by sending large files in a single prompt.
+
+### Findings
+
+* `/audit_file` was technically functional, but audits of larger files, especially `chat_agent.py`, were unreliable.
+* The model frequently ignored the required response structure.
+* Responses sometimes included:
+
+  * `Analysis`
+  * `Self-Correction`
+  * invented functions
+  * recommendations unrelated to the actual code
+* The issue was confirmed not to be caused by:
+
+  * file truncation
+  * insufficient context length
+  * incorrect file reading
+  * temperature alone
+  * system prompt conflict alone
+
+### Diagnostics
+
+* `chat_agent.py` size: `11856` characters.
+* Generated audit prompt size: approximately `14970` characters.
+* `MAX_FILE_CHARS = 20000`, so the file was not truncated.
+* `gemma4:e4b` context length: `131072`.
+* Confirmed that `read_project_file()` returns the full file.
+* Confirmed that the native Ollama API with:
+
+  * `"think": false`
+  * `"temperature": 0.1`
+
+  follows short and explicit instructions correctly.
+* Confirmed that full-file audits can remain unstable even with `think: false`.
+* Confirmed that auditing a small, explicit code segment produces the required 7-section response structure.
+
+### Added
+
+* Added `run_ollama_audit(prompt)` helper.
+* Audit requests now use the native Ollama `/api/chat` endpoint.
+* Audit requests use:
+
+  * `think: false`
+  * `temperature: 0.1`
+  * `stream: false`
+* Updated `/audit_file` to use `run_ollama_audit()` instead of `agent.run_sync()`.
+* Added a new command:
+
+  `/audit_lines <path> <start> <end>`
+
+### `/audit_lines` Functionality
+
+The command:
+
+* accepts a file path;
+* accepts start and end line numbers;
+* validates that line numbers are integers;
+* validates the requested line range;
+* limits audits to a maximum of 200 lines;
+* protects against path traversal;
+* checks whether the file exists;
+* checks whether the path points to a file;
+* safely reads UTF-8 content;
+* includes real line numbers in the selected code;
+* sends only the selected code segment to Gemma 4;
+* uses the native Ollama audit execution path.
+
+### Verified
+
+* `python -m py_compile prompt_builder.py` passes.
+* `python -m py_compile chat_agent.py` passes.
+* Native Ollama test with `think: false` returned the exact requested output.
+* A small code-segment audit returned all 7 required sections.
+* `/audit_lines chat_agent.py 339 363` executed successfully.
+* The response did not include:
+
+  * `Self-Correction`
+  * visible internal thinking
+  * broken section structure
+
+### Important Interpretation
+
+The final `/audit_lines chat_agent.py 339 363` result returned `No-go`, but this was not a command failure.
+
+The selected line range ended in the middle of the `/audit_lines` implementation, so the model could not see:
+
+* the remaining path validation logic;
+* file reading logic;
+* selected-content construction;
+* the `build_file_audit_prompt()` call;
+* the `run_ollama_audit()` call.
+
+Segmented auditing evaluates only the provided code segment. The user must therefore select a complete function or complete logical block.
+
+### Current Status
+
+* `/audit_file` remains experimental for larger files.
+* `/audit_lines` is the more reliable workflow for auditing a specific function or logic block.
+* Gemma 4 performs better with small, tightly scoped code contexts.
+* Automatic full-file segmentation is not yet implemented.
+
+### Next Recommended Step
+
+Start the next session by:
+
+1. identifying the full line range of the `/audit_lines` implementation;
+2. auditing the complete block;
+3. testing invalid input scenarios;
+4. adding `/audit_lines` to `/help`;
+5. then deciding whether `/audit_file` should remain, be restricted, or be replaced by a segmented workflow.
+
+### Deferred
+
+Not implemented in this session:
+
+* automatic function detection;
+* automatic file segmentation;
+* multi-segment result aggregation;
+* structured Pydantic audit output;
+* automatic patch generation;
+* `/patch_plan`;
+* multi-file audit.
+
+
+## Changelog — Gemma 4 + Ollama + Pydantic Agent Setup
+
+### Added
+
+* Added and tested local `gemma4:e4b` model through Ollama.
+* Confirmed that `gemma4:e4b` is available in the local Ollama model list.
+* Added basic Pydantic AI integration with Ollama-compatible endpoint.
+* Added runtime configuration using:
+
+  * Pydantic AI as the orchestration layer
+  * Ollama as the local model backend
+  * `localhost:11434` as the Ollama API endpoint
+  * `gemma4:e4b` as the active model
+
+### Changed
+
+* Switched the agent model configuration from the previous `qwen3:8b` setup to `gemma4:e4b`.
+* Reorganized the agent system prompt into a separate `SYSTEM_PROMPT` constant.
+* Updated the system prompt to define the agent as a local technical audit assistant.
+* Added runtime facts to prevent the model from incorrectly claiming it runs on Google, OpenAI, Anthropic, or cloud infrastructure.
+* Set English as the default response language for more stable technical output.
+* Added clearer response mode rules for:
+
+  * simple facts
+  * strategic critique
+  * code/repo/project audits
+
+### Verified
+
+* Verified that `ollama pull gemma4:e4b` completed successfully.
+* Verified that `ollama list` shows `gemma4:e4b`.
+* Verified that `ollama run gemma4:e4b` works in the terminal.
+* Verified that `/set nothink` disables visible thinking output in the Ollama CLI session.
+* Verified that a standalone `test_gemma4.py` script can call the model through Pydantic AI and Ollama.
+* Verified that the main `chat_agent.py` starts successfully.
+* Verified that the agent responds to a basic `hello` input.
+* Verified that `/audit_file chat_agent.py` command runs without crashing.
+
+### Known Issues
+
+* `/audit_file` currently returns reasoning-style output instead of the required final audit structure.
+* The model may expose planning phrases such as “Analyze the Code”, “Identify Weaknesses”, or “Self-Correction”.
+* The audit command may include unwanted formatting artifacts such as `</response>`.
+* Output discipline for audit mode still needs to be tightened in the command-specific prompt.
+* Further prompt hardening is needed before treating `/audit_file` as production-ready.
+
+### Current Status
+
+The local Gemma 4 + Ollama + Pydantic AI integration is technically working. The agent starts, connects to the local model, and executes commands. The next improvement area is not model loading or connectivity, but audit prompt discipline and output formatting.
+
+
+## 2026-06-05 — Tomas Critique Agent v0.5
+
+### File-Aware Audit MVP
+
+Implemented and tested `/audit_file <path>` as the next practical workflow capability after Smart Context Injection.
+
+The main goal of v0.5 was to move from summary-level project critique to concrete file-level audit using actual selected file contents.
+
+### Added
+
+* Added `build_file_audit_prompt(file_path, file_content)` to `prompt_builder.py`.
+* Added `/audit_file <path>` command to `chat_agent.py`.
+* Added file-aware audit workflow:
+
+  * accept one explicit relative file path
+  * validate project path boundaries
+  * read selected file content
+  * build a dedicated file audit prompt
+  * run the agent against the selected file
+  * return structured code-level critique
+
+### Improved
+
+* `/audit_file` now uses actual file contents instead of only compact project context.
+* The agent can now perform code-level critique for a selected file.
+* File audit remains explicit and controlled, avoiding automatic full-project loading.
+* Increased `MAX_FILE_CHARS` from `8000` to `20000` so larger project files such as `chat_agent.py` can be audited without premature truncation.
+* Strengthened `/audit_file` path validation using `Path.resolve()` and `relative_to(project_root)`.
+* Added stronger file checks with `is_file()` instead of only checking whether a path is a directory.
+
+### Verified
+
+* `python -m py_compile prompt_builder.py` passes.
+
+* `python -m py_compile chat_agent.py` passes.
+
+* `python -m py_compile project_config.py` passes.
+
+* `python -m py_compile project_scanner.py` passes.
+
+* `/audit_file` without a path returns usage guidance.
+
+* `/audit_file chat_agent.py` reads the file and returns a structured file-level audit.
+
+* `/audit_file missing.py` returns:
+
+  `File not found: missing.py`
+
+* `/audit_file ../memory_store.py` returns:
+
+  `Access denied: ../memory_store.py`
+
+* `/audit_file __pycache__` returns:
+
+  `Path is not a file: __pycache__`
+
+### Current status
+
+The agent now supports:
+
+* persistent memory
+* SQLite-backed memory CRUD
+* conversation history storage
+* safe local project inspection
+* compact project summary generation
+* automatic project context injection
+* `/context` runtime visibility
+* `/inspect <path>` file inspection
+* `/audit` summary-level project critique
+* `/audit_file <path>` file-level code audit
+
+### Design notes
+
+* `/audit_file` intentionally audits one explicit file at a time.
+* The command reuses the existing controlled local file-reading approach.
+* Full project auto-loading is still avoided.
+* The system remains CLI-first, explicit, and easy to debug.
+* v0.5 is a workflow capability release, not a production hardening release.
+
+### Known limitations
+
+* `/audit_file` audits only one file at a time.
+* The audit may still over-prioritize general architecture issues such as SQLite connection management.
+* `/inspect` still uses the older path validation style and can be aligned later with `/audit_file`.
+* The agent does not yet generate patch plans automatically.
+* The agent does not yet compare logic across multiple files.
+* `MAX_FILE_CHARS = 20000` is enough for current tests but may still truncate larger files.
+
+### Deferred
+
+Do not address these as part of v0.5:
+
+* SQLite connection refactor
+* embeddings
+* RAG
+* vector database
+* automatic full-project loading
+* multi-agent orchestration
+* automatic patch application
+* multi-file audit
+
+### Next recommended version
+
+v0.6 should implement one of:
+
+* `/patch_plan <path>` — generate a safe patch sequence for one audited file
+* `/test_plan <path>` — generate exact CLI and manual tests for one file
+* `/audit_flow <entry_file>` — audit one file and recommend which related file to inspect next
+
+Recommended next step:
+
+`/patch_plan <path>`
+
+This would naturally extend the current workflow:
+
+`/audit_file chat_agent.py → /patch_plan chat_agent.py → manual edit → py_compile → manual tests → changelog`
+
+
+
+
+## 2026-06-04 — Tomas Critique Agent v0.4
+
+### Smart Context Injection MVP
+
+Upgraded Tomas Critique Agent from a command-based project reader into a context-aware local assistant.
+
+The main goal of v0.4 was to make normal user messages benefit from project context automatically, instead of requiring the user to manually call `/project_summary` before asking project-related questions.
+
+### Added
+
+* Added `prompt_builder.py` for assembling the final LLM prompt.
+* Added `build_system_prompt(user_input: str)` to combine:
+
+  * agent behavior rules
+  * stored memory context
+  * compact project context
+  * current user message
+* Added automatic compact project context injection into normal agent conversations.
+* Added stronger project-aware behavior rules:
+
+  * use provided project context for project-related questions
+  * treat `PROJECT CONTEXT` as real available project metadata
+  * distinguish between compact project awareness and full file inspection
+  * avoid claiming that project access is unavailable when project context is present
+  * ask the user to run `/inspect <path>` or `/read_file <path>` when full file contents are needed
+* Added `/context` command to show active runtime context:
+
+  * memory injection status
+  * project context injection status
+  * project root
+  * indexed file count
+  * full-file inspection mode
+* Added `/inspect <path>` command as a clearer alias for project file inspection.
+* Added `/audit` command for basic project-level critique using current memory and compact project context.
+
+### Improved
+
+* Normal user messages can now use project context without manually calling `/project_summary`.
+* Prompt construction is now separated from CLI command handling.
+* The agent now has clearer separation between:
+
+  * CLI command routing
+  * memory context
+  * project context
+  * final LLM prompt assembly
+* `/context` makes runtime state easier to debug.
+* `/inspect <path>` improves usability compared with only having `/read_file <path>`.
+* The agent is now closer to a practical local coding assistant, not only a slash-command interface.
+
+### Fixed During Implementation
+
+* Fixed indentation errors introduced while adding `/context`, `/inspect`, and `/audit`.
+* Fixed broken `/context` block where `files = scan_project_files(PROJECT_ROOT)` was not indented under the `if text == "/context"` condition.
+* Fixed `/audit` block indentation where `return result.data` was incorrectly nested.
+* Fixed `/read_file` command indentation where the command block did not match the surrounding handler indentation.
+* Fixed `return result.data` being used outside a function in the main chat loop.
+* Replaced invalid main-loop `return` behavior with normal answer handling through:
+
+  * `result = agent.run_sync(full_prompt)`
+  * `answer = result.output`
+* Fixed `UnboundLocalError` in `/inspect` by moving `if not file_name:` inside the `/inspect` block.
+* Fixed `/help` command formatting so newly added commands appear on separate lines.
+* Switched `/audit` from `result.data` to `result.output` for consistency with the main response loop.
+* Fixed `prompt_builder.py` where `return f"""..."""` was accidentally placed outside `build_system_prompt()`.
+
+### Verified
+
+* `python -m py_compile chat_agent.py` passes after indentation and main-loop fixes.
+* `python -m py_compile prompt_builder.py` passes after rebuilding the file.
+* `/context` works and returns runtime context.
+* `/context` shows:
+
+  * memory injection enabled
+  * project context injection enabled
+  * project root
+  * indexed file count
+  * full-file inspection is explicit only
+* `/inspect chat_agent.py` works and reads the selected project file.
+* Normal project-related questions now receive answers grounded in indexed project files.
+* The agent no longer says that file access is unavailable after prompt hardening and message history cleanup.
+* Conversation history was cleared from the `messages` table to remove repeated bad prior responses.
+* The agent now correctly identifies file-aware audit as the next priority after Smart Context Injection.
+
+### Current status
+
+The agent now has:
+
+* persistent memory
+* SQLite-backed memory CRUD
+* conversation history storage
+* safe local project inspection
+* compact project summary generation
+* automatic project context injection into normal messages
+* `/context` runtime visibility
+* `/inspect <path>` file inspection
+* basic `/audit` project critique
+* stronger project-aware prompt rules
+
+### Design notes
+
+* Project context injection is intentionally compact.
+* Full file contents are still not automatically loaded into every normal message.
+* Full file contents remain command-driven through `/inspect <path>` or `/read_file <path>`.
+* This avoids token bloat, keeps behavior safer, and makes debugging easier.
+* `/audit` is currently summary-level, not file-level.
+* The next major capability should be file-aware audit, not embeddings, RAG, memory pruning, or automatic full-project loading.
+
+---
+
+## 2026-06-04 — Tomas Critique Agent v0.4.1
+
+### Stronger Project-Aware Prioritization Rules
+
+Hardened the agent prompt after testing showed that the agent technically used project context, but still recommended generic improvements such as memory pruning, metadata optimization, and scanner optimization too early.
+
+### Added
+
+* Added stronger project prioritization rules to `prompt_builder.py`.
+* Added explicit instruction that when asked what to improve next, the agent should recommend the highest-ROI missing capability from the current project status.
+* Added rule that completed foundations should not be recommended as if they are missing:
+
+  * memory CRUD
+  * project scanning
+  * project summary
+  * safe file inspection
+  * smart context injection
+* Added rule to avoid recommending memory pruning, metadata optimization, embeddings, RAG, or scanner optimization unless the user explicitly asks for scale/performance work.
+* Added rule that after Smart Context Injection, the next priority should be file-aware project audit.
+* Added rule to prefer workflow improvements over internal optimization.
+* Added rule to prefer one concrete next command or capability over broad architecture advice.
+* Added target next capability:
+
+  * `/audit_file <path>`
+
+### Improved
+
+* The agent now recommends file-aware audit as the correct next step.
+* The agent now better distinguishes between:
+
+  * already completed infrastructure
+  * useful but premature optimization
+  * the next missing workflow capability
+* The agent now avoids jumping too early to:
+
+  * memory pruning
+  * metadata filtering
+  * embeddings
+  * RAG
+  * scanner optimization
+  * automatic full-project loading
+
+### Verified
+
+* After clearing old conversation history, the agent stopped repeating the incorrect phrase that file access is unavailable.
+* When asked what must be improved next, the agent now points to file-aware audit.
+* The agent correctly identifies `/audit_file <path>` as the next capability.
+* The agent recommends inspecting one file at a time instead of loading the whole project automatically.
+
+### Current status
+
+v0.4.1 improves decision quality, not architecture.
+
+The agent now understands that the next practical improvement is not another internal optimization layer, but a better project-aware execution workflow.
+
+### Known limitations
+
+* `/audit_file <path>` is not implemented yet.
+* `/audit` is still based on compact project context and does not inspect selected file contents directly.
+* The agent may still need more guardrails to avoid making claims about implementation details not visible in `PROJECT CONTEXT`.
+* The agent should use relative paths such as `/inspect chat_agent.py`, not absolute paths, when suggesting inspection commands.
+
+### Next recommended version
+
+v0.5 should implement:
+
+`/audit_file <path>`
+
+The command should:
+
+* accept one explicit project file path
+* reuse the existing safe file reading flow
+* include selected file content in the audit prompt
+* return code-level critique
+* identify concrete risks and next patches
+* avoid auditing the whole project automatically
+
+Recommended first test:
+
+`/audit_file chat_agent.py`
+
+### Do not do next
+
+Do not jump yet to:
+
+* embeddings
+* RAG
+* vector database
+* auto file selection
+* full-project auto loading
+* multi-agent orchestration
+* memory pruning as the main priority
+
+These may become useful later, but they are premature before file-aware audit works.
+
+
+## 2026-06-03 — Tomas Critique Agent v0.3
+
+### Project Context Layer MVP
+
+Implemented and tested a local project context layer for Tomas Critique Agent.
+
+### Added
+- Added `project_config.py` for project indexing settings.
+- Added `project_scanner.py` for safe local project file discovery.
+- Added `project_context.py` for compact project summary generation.
+- Added slash commands:
+  - `/project`
+  - `/project_summary`
+  - `/project_files`
+  - `/read_file <path>`
+- Added project file filtering by allowed extensions:
+  - `.py`
+  - `.md`
+  - `.txt`
+  - `.json`
+  - `.toml`
+  - `.yaml`
+  - `.yml`
+- Added excluded directory rules for:
+  - `.git`
+  - `__pycache__`
+  - `.venv`
+  - `venv`
+  - `node_modules`
+  - `.pytest_cache`
+- Added safe file reading with `MAX_FILE_CHARS = 8000`.
+- Added path traversal protection for `/read_file`.
+
+### Verified
+- `/project` returns project root, indexed file count, and main files.
+- `/project_summary` returns compact project context.
+- `/project_files` lists indexed project files.
+- `/read_file project_config.py` reads a valid project file.
+- `/read_file missing.py` returns `File not found`.
+- `/read_file __pycache__` returns directory warning.
+- `/read_file ../memory_store.py` returns `Access denied`.
+- Invalid commands such as `/project_wrong` return `Unknown command` and updated command list.
+- `__pycache__` and `memory.db` are not indexed.
+
+### Current status
+The agent now understands the local project structure and can inspect project files through controlled CLI commands.
+
+### Design notes
+- Project context is currently available through explicit commands.
+- Project context is not yet automatically injected into normal LLM prompts.
+- This keeps v0.3 safer, easier to debug, and less noisy.
+
+## 2026-06-03 — Tomas Critique Agent v0.2
+
+### Persistent Memory CRUD MVP
+
+Implemented and tested a controlled SQLite-based persistent memory layer for Tomas Critique Agent.
+
+### Added
+- Added `memory_store.py` for memory database operations.
+- Added SQLite `memories` table with:
+  - `id`
+  - `content`
+  - `memory_type`
+  - `created_at`
+  - `updated_at`
+- Added memory CRUD functions:
+  - create memory
+  - list memories
+  - update memory by ID
+  - delete memory by ID
+  - clear all memories
+  - format memories for user display
+  - format memories for prompt injection
+- Added slash-command handler in `chat_agent.py`.
+- Added supported commands:
+  - `/help`
+  - `/memory`
+  - `/remember <fact>`
+  - `/update_memory <id> | <new content>`
+  - `/delete_memory <id>`
+  - `/forget <text>`
+  - `/clear_memory`
+- Added unknown slash-command guard so invalid commands are no longer passed to the LLM.
+- Integrated stored memories into the agent prompt before `agent.run_sync(prompt)`.
+
+### Verified
+- `/memory` returns stored memories.
+- `/remember` creates persistent memory.
+- `/update_memory` updates existing memory using the required `|` separator.
+- Mistyped commands such as `/update_memry` return `Unknown command`.
+- `/delete_memory` removes a memory item by ID.
+- Memory remains available after exiting and restarting the agent.
+- Stored memory is available in normal conversation, not only through `/memory`.
+
+### Current status
+The agent now has a working MVP memory system with:
+- manual persistent memory
+- SQLite storage
+- CRUD operations
+- CLI slash-command interface
+- command validation
+- prompt-level memory injection
+
+### Design notes
+- Commands intentionally require the `/` prefix.
+- Plain text such as `help` is treated as a normal user message and passed to the LLM.
