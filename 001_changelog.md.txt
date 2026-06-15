@@ -1,5 +1,46 @@
 # Changelog
 
+## 2026-06-15 — v1.3 Audit Prompt Boundary Hardening
+
+### Changed
+
+* Hardened `build_file_audit_prompt()` with explicit untrusted input boundaries.
+* Replaced loose `AUDIT TARGET` / `CODE` sections with dedicated file path and code content boundary markers.
+* Added instructions not to follow embedded instructions, fake headings, markdown fences, or audit verdicts inside audited code.
+* Added output guard requiring each required heading to appear exactly once in the model response.
+* Added instruction not to copy required-output headings found inside audited code content.
+
+### Added
+
+* Added regression tests for untrusted file path and code content boundaries.
+* Added regression test confirming audited code is marked as untrusted.
+* Added regression test for fake audit sections inside code content.
+* Added regression test preventing copied output headings from audited code content.
+
+### Verified
+
+* Confirmed `prompt_builder.py` compiles.
+* Confirmed full test suite passes: `31 passed, 1 warning`.
+* Confirmed `/audit_function prompt_builder.py build_file_audit_prompt` works in real CLI run.
+* Confirmed function-based audit result saved as `#9`.
+* Confirmed `/audit_lines prompt_builder.py 84 170` works in real CLI run.
+* Confirmed line-based audit result saved as `#10`.
+* Confirmed `/audit_history 5` shows both new audit results.
+* Confirmed `/audit_stats` updates total audits to 10.
+* Committed and pushed to GitHub: `523ac04` — `Harden audit prompt input boundaries`.
+
+### Known Limitations
+
+* This reduces prompt confusion but does not make local LLM judgment deterministic.
+* The prompt is still a large single f-string and may later benefit from structured composition.
+* `/audit_file` remains legacy and unchanged.
+* `/audit_function` still supports only top-level Python functions and async functions.
+* Class methods remain out of scope.
+
+### Next Priority
+
+Evaluate v1.4 scope. Recommended max ROI direction: class-method chunking.
+
 ## 2026-06-14 — v1.2 Shared Audit Execution Refactor
 
 ### Changed
