@@ -1,5 +1,52 @@
 # Changelog
 
+## 2026-06-28 — v1.4 Class Method Chunking MVP
+
+### Added
+
+- Added AST-based direct class method range detection.
+- Added `/audit_method <path> <ClassName.method_name>` CLI command.
+- Added support for auditing regular and async class methods without manual line ranges.
+- Added regression tests for:
+  - regular class method detection;
+  - async class method detection;
+  - missing class handling;
+  - missing method handling;
+  - avoiding accidental top-level function matches.
+
+### Changed
+
+- Updated `/help` with the new `/audit_method` command.
+- Reused the existing shared validated audit execution path for method-based audits.
+
+### Verified
+
+- Confirmed `chat_agent.py` compiles.
+- Confirmed targeted chunker tests pass:
+
+```text
+9 passed
+
+Confirmed full test suite passes:
+36 passed, 1 warning
+Confirmed /audit_method tmp_method_fixture.py DemoAgent.target_method works in real CLI run.
+Confirmed method-based audit result saved as #11.
+Confirmed /audit_history 5 shows the new method-based audit result.
+Confirmed /audit_stats updates total audits to 11.
+Removed temporary manual CLI test fixture before commit.
+
+### Known Limitations
+Supports direct class methods only.
+Does not support nested classes.
+Does not resolve inherited methods.
+Does not audit multiple methods with one command.
+/audit_file remains legacy and unchanged.
+
+
+
+
+
+
 ## 2026-06-15 — v1.3 Audit Prompt Boundary Hardening
 
 ### Changed
@@ -54,12 +101,7 @@ Evaluate v1.4 scope. Recommended max ROI direction: class-method chunking.
 ### Verified
 
 - Confirmed `chat_agent.py` compiles.
-- Confirmed full test suite passes:
-
-```text
-27 passed, 1 warning
-```
-
+- Confirmed full test suite passes: 27 passed, 1 warning
 - Confirmed `/audit_function prompt_builder.py build_file_audit_prompt` works in real CLI run.
 - Confirmed function-based audit result saved as `#5`.
 - Confirmed `/audit_lines prompt_builder.py 84 158` works in real CLI run.
@@ -74,10 +116,6 @@ Evaluate v1.4 scope. Recommended max ROI direction: class-method chunking.
 - Class methods remain out of scope for this release.
 - Duplicate function names in nested scopes remain out of scope.
 
-### Next Priority
-
-Stop after commit.
-
 ## 2026-06-14 — v1.1 Function-Aware Chunking MVP
 
 ### Added
@@ -85,8 +123,7 @@ Stop after commit.
 - Added `code_chunker.py` with AST-based function range detection.
 - Added `/audit_function <path> <function_name>` CLI command.
 - Added support for auditing Python functions by name instead of manually selecting line ranges.
-- Added regression tests for:
-  - regular function detection;
+- Added regression tests for    - regular function detection;
   - async function detection;
   - missing function handling;
   - syntax error handling.

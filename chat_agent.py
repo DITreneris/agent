@@ -10,7 +10,13 @@ from project_scanner import scan_project_files, format_file_list, read_project_f
 from project_context import build_project_summary
 from prompt_builder import build_system_prompt, build_file_audit_prompt
 from audit_runner import run_validated_audit
-from code_chunker import find_python_function_range, FunctionNotFoundError
+from code_chunker import (
+    find_python_function_range,
+    find_python_method_range,
+    FunctionNotFoundError,
+    MethodNotFoundError,
+)
+
 import json
 import urllib.request
 
@@ -324,6 +330,7 @@ def handle_memory_command(user_input: str):
             "/audit_file <path>\n"
             "/audit_lines <path> <start> <end>\n"
             "/audit_function <path> <function_name>\n"
+            "/audit_method <path> <ClassName.method_name>\n"            
             "/audit_history [limit]\n"
             "/audit_stats\n"
     )
@@ -491,6 +498,78 @@ def handle_memory_command(user_input: str):
 
         audit_target = (
             f"{file_name}, function {function_name}, "
+            f"lines {start_line}-{end_line}"
+        )
+
+        return run_selected_code_audit(
+            file_name=file_name,
+            audit_target=audit_target,
+            start_line=start_line,
+            end_line=end_line,
+            selected_content=selected_content,
+        )
+
+    if text.startswith("/audit_method"):
+        arguments = text.removeprefix("/audit_method").strip().split()
+
+        if len(arguments) != 2:
+            return "Usage: /audit_method <path> <ClassName.method_name>"
+
+        file_name, method_target = arguments
+
+        if "." not in method_target:
+            return "Usage: /audit_method <path> <ClassName.method_name>"
+
+        class_name, method_name = method_target.split(".", 1)
+
+        if not class_name or not method_name:
+            return "Usage: /audit_method <path> <ClassName.method_name>"
+
+        project_root = PROJECT_ROOT.resolve()
+        file_path = (project_root / file_name).resolve()
+
+        try:
+            file_path.relative_to(project_root)
+        except ValueError:
+            return f"Access denied: {file_name}"
+
+        if not file_path.exists():
+            return f"File not found: {file_name}"
+
+        if not file_path.is_file():
+            return f"Path is not a file: {file_name}"
+
+        try:
+            start_line, end_line = find_python_method_range(
+                file_path,
+                class_name,
+                method_name,
+            )
+        except MethodNotFoundError:
+            return f"Method not found: {class_name}.{method_name}"
+        except SyntaxError:
+            return f"Cannot parse Python file: {file_name}"
+        except OSError as exc:
+            return f"Could not read file: {exc}"
+
+        if end_line - start_line + 1 > 200:
+            return "Maximum audit range is 200 lines."
+
+        try:
+            lines = file_path.read_text(
+                encoding="utf-8",
+                errors="replace",
+            ).splitlines()
+        except OSError as exc:
+            return f"Could not read file: {exc}"
+
+        selected_content = "\n".join(
+            f"{line_number}: {lines[line_number - 1]}"
+            for line_number in range(start_line, end_line + 1)
+        )
+
+        audit_target = (
+            f"{file_name}, method {class_name}.{method_name}, "
             f"lines {start_line}-{end_line}"
         )
 
