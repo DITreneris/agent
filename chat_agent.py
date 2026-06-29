@@ -3,6 +3,7 @@ from pydantic_ai import Agent, ModelSettings
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 import sqlite3
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from project_config import PROJECT_ROOT
@@ -186,6 +187,67 @@ def run_ollama_audit(prompt: str) -> str:
     return data["message"]["content"]
 
 
+@dataclass(frozen=True)
+class SelectedCodeAuditPreparation:
+    file_path: Path
+    relative_path: str
+    selected_content: str
+    start_line: int
+    end_line: int
+
+
+def prepare_selected_code_audit(
+    project_root: Path,
+    file_name: str,
+    start_line: int,
+    end_line: int,
+) -> SelectedCodeAuditPreparation:
+    if start_line < 1 or end_line < start_line:
+        raise ValueError("Invalid line range.")
+
+    if end_line - start_line + 1 > 200:
+        raise ValueError("Maximum audit range is 200 lines.")
+
+    resolved_project_root = project_root.resolve()
+    file_path = (resolved_project_root / file_name).resolve()
+
+    try:
+        file_path.relative_to(resolved_project_root)
+    except ValueError:
+        raise ValueError(f"Access denied: {file_name}")
+
+    if not file_path.exists():
+        raise ValueError(f"File not found: {file_name}")
+
+    if not file_path.is_file():
+        raise ValueError(f"Path is not a file: {file_name}")
+
+    try:
+        lines = file_path.read_text(
+            encoding="utf-8",
+            errors="replace",
+        ).splitlines()
+    except OSError as exc:
+        raise ValueError(f"Could not read file: {exc}")
+
+    if start_line > len(lines):
+        raise ValueError(f"Start line exceeds file length: {len(lines)} lines")
+
+    normalized_end_line = min(end_line, len(lines))
+
+    selected_content = "\n".join(
+        f"{line_number}: {lines[line_number - 1]}"
+        for line_number in range(start_line, normalized_end_line + 1)
+    )
+
+    return SelectedCodeAuditPreparation(
+        file_path=file_path,
+        relative_path=file_name,
+        selected_content=selected_content,
+        start_line=start_line,
+        end_line=normalized_end_line,
+    )
+
 def run_selected_code_audit(
     file_name: str,
     audit_target: str,
@@ -330,10 +392,11 @@ def handle_memory_command(user_input: str):
             "/audit_file <path>\n"
             "/audit_lines <path> <start> <end>\n"
             "/audit_function <path> <function_name>\n"
-            "/audit_method <path> <ClassName.method_name>\n"            
+            "/audit_method <path> <ClassName.method_name>\n"
             "/audit_history [limit]\n"
             "/audit_stats\n"
     )
+
 
     if text == "/project":
         files = scan_project_files(PROJECT_ROOT)
@@ -480,33 +543,27 @@ def handle_memory_command(user_input: str):
         except OSError as exc:
             return f"Could not read file: {exc}"
 
-        if end_line - start_line + 1 > 200:
-            return "Maximum audit range is 200 lines."
-
         try:
-            lines = file_path.read_text(
-                encoding="utf-8",
-                errors="replace",
-            ).splitlines()
-        except OSError as exc:
-            return f"Could not read file: {exc}"
-
-        selected_content = "\n".join(
-            f"{line_number}: {lines[line_number - 1]}"
-            for line_number in range(start_line, end_line + 1)
-        )
+            prepared = prepare_selected_code_audit(
+                project_root=PROJECT_ROOT,
+                file_name=file_name,
+                start_line=start_line,
+                end_line=end_line,
+            )
+        except ValueError as exc:
+            return str(exc)
 
         audit_target = (
             f"{file_name}, function {function_name}, "
-            f"lines {start_line}-{end_line}"
+            f"lines {prepared.start_line}-{prepared.end_line}"
         )
 
         return run_selected_code_audit(
             file_name=file_name,
             audit_target=audit_target,
-            start_line=start_line,
-            end_line=end_line,
-            selected_content=selected_content,
+            start_line=prepared.start_line,
+            end_line=prepared.end_line,
+            selected_content=prepared.selected_content,
         )
 
     if text.startswith("/audit_method"):
@@ -552,33 +609,27 @@ def handle_memory_command(user_input: str):
         except OSError as exc:
             return f"Could not read file: {exc}"
 
-        if end_line - start_line + 1 > 200:
-            return "Maximum audit range is 200 lines."
-
         try:
-            lines = file_path.read_text(
-                encoding="utf-8",
-                errors="replace",
-            ).splitlines()
-        except OSError as exc:
-            return f"Could not read file: {exc}"
-
-        selected_content = "\n".join(
-            f"{line_number}: {lines[line_number - 1]}"
-            for line_number in range(start_line, end_line + 1)
-        )
+            prepared = prepare_selected_code_audit(
+                project_root=PROJECT_ROOT,
+                file_name=file_name,
+                start_line=start_line,
+                end_line=end_line,
+            )
+        except ValueError as exc:
+            return str(exc)
 
         audit_target = (
             f"{file_name}, method {class_name}.{method_name}, "
-            f"lines {start_line}-{end_line}"
+            f"lines {prepared.start_line}-{prepared.end_line}"
         )
 
         return run_selected_code_audit(
             file_name=file_name,
             audit_target=audit_target,
-            start_line=start_line,
-            end_line=end_line,
-            selected_content=selected_content,
+            start_line=prepared.start_line,
+            end_line=prepared.end_line,
+            selected_content=prepared.selected_content,
         )
 
     if text.startswith("/audit_lines"):
@@ -595,52 +646,26 @@ def handle_memory_command(user_input: str):
         except ValueError:
             return "Line numbers must be integers."
 
-        if start_line < 1 or end_line < start_line:
-            return "Invalid line range."
-
-        if end_line - start_line + 1 > 200:
-            return "Maximum audit range is 200 lines."
-
-        project_root = PROJECT_ROOT.resolve()
-        file_path = (project_root / file_name).resolve()
-
         try:
-            file_path.relative_to(project_root)
-        except ValueError:
-            return f"Access denied: {file_name}"
+            prepared = prepare_selected_code_audit(
+                project_root=PROJECT_ROOT,
+                file_name=file_name,
+                start_line=start_line,
+                end_line=end_line,
+            )
+        except ValueError as exc:
+            return str(exc)
 
-        if not file_path.exists():
-            return f"File not found: {file_name}"
-
-        if not file_path.is_file():
-            return f"Path is not a file: {file_name}"
-
-        try:
-            lines = file_path.read_text(
-                encoding="utf-8",
-                errors="replace",
-            ).splitlines()
-        except OSError as exc:
-            return f"Could not read file: {exc}"
-
-        if start_line > len(lines):
-            return f"Start line exceeds file length: {len(lines)} lines"
-
-        end_line = min(end_line, len(lines))
-
-        selected_content = "\n".join(
-            f"{line_number}: {lines[line_number - 1]}"
-            for line_number in range(start_line, end_line + 1)
+        audit_target = (
+            f"{file_name}, lines {prepared.start_line}-{prepared.end_line}"
         )
-
-        audit_target = f"{file_name}, lines {start_line}-{end_line}"
 
         return run_selected_code_audit(
             file_name=file_name,
             audit_target=audit_target,
-            start_line=start_line,
-            end_line=end_line,
-            selected_content=selected_content,
+            start_line=prepared.start_line,
+            end_line=prepared.end_line,
+            selected_content=prepared.selected_content,
         )
 
 

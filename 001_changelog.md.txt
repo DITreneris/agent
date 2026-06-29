@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-06-29 — v1.5 Shared File Selection Refactor
+
+### Changed
+
+- Added shared selected-code audit preparation helper.
+- Refactored `/audit_lines`, `/audit_function`, and `/audit_method` to use the shared selected-code preparation path.
+- Reduced duplicated path validation, file reading, line range validation, max range enforcement, and numbered selected content formatting logic.
+
+### Verified
+
+- Confirmed `/audit_lines` works in real CLI run and saved audit result #12.
+- Confirmed `/audit_function` works in real CLI run and saved audit result #13.
+- Confirmed `/audit_method` works in real CLI run and saved audit result #14.
+- Confirmed `/audit_history 5` shows the new selected-code audit results.
+- Confirmed `/audit_stats` updated total audits to 14.
+- Confirmed temporary method fixture was removed after manual verification.
+- Confirmed `chat_agent.py` compiles.
+- Confirmed full test suite passes.
+
+### Known Limitations
+
+- `/audit_file` remains legacy and unchanged.
+- `/audit_function` still supports top-level Python functions only.
+- `/audit_method` still supports direct class methods only.
+- Nested classes and inherited methods remain out of scope.
+- Some path resolution logic remains in `/audit_function` and `/audit_method` because AST range detection still requires a resolved file path.
+- Direct unit tests for `prepare_selected_code_audit()` were deferred because `chat_agent.py` currently runs the CLI loop at import time. Import-safe CLI entrypoint refactor is left for a future cleanup release.
+
 ## 2026-06-28 — v1.4 Class Method Chunking MVP
 
 ### Added
