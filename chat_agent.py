@@ -146,9 +146,6 @@ def load_recent_messages(limit: int = 10):
     rows.reverse()
     return [f"{role}: {content}" for role, content in rows]
 
-print("\nTomas Critique Agent")
-print("Type 'exit' to quit.\n")
-
 MAX_HISTORY = 10
 history = load_recent_messages(MAX_HISTORY)
 
@@ -760,44 +757,51 @@ Return only:
 
     return None
 
+def main() -> None:
+    while True:
+        user_input = input("You> ").strip()
 
-while True:
-    user_input = input("You> ").strip()
+        if user_input.lower() in ["exit", "quit"]:
+            break
 
-    if user_input.lower() in ["exit", "quit"]:
-        break
+        command_response = handle_memory_command(user_input)
 
-    command_response = handle_memory_command(user_input)
+        if command_response is not None:
+            print("\nAgent>")
+            print(command_response)
+            print("\n" + "-" * 60 + "\n")
+            continue
 
-    if command_response is not None:
-        print("\nAgent>")
-        print(command_response)
-        print("\n" + "-" * 60 + "\n")
-        continue
+        history.append(f"User: {user_input}")
+        save_message("User", user_input)
+        history = history[-MAX_HISTORY:]
 
-    history.append(f"User: {user_input}")
-    save_message("User", user_input)
-    history = history[-MAX_HISTORY:]
+        stored_memory = format_memories_for_prompt()
 
-    stored_memory = format_memories_for_prompt()
-
-    prompt = f"""Recent conversation:
+        prompt = f"""Recent conversation:
 {chr(10).join(history)}
 
 Current user message:
 {user_input}
 """
 
-    full_prompt = build_system_prompt(prompt)
-    result = agent.run_sync(full_prompt)
+        full_prompt = build_system_prompt(prompt)
+        result = agent.run_sync(full_prompt)
 
-    answer = result.output
+        answer = result.output
 
-    history.append(f"Assistant: {answer}")
-    save_message("Assistant", answer)
-    history = history[-MAX_HISTORY:]
+        history.append(f"Assistant: {answer}")
+        save_message("Assistant", answer)
+        history = history[-MAX_HISTORY:]
 
-    print("\nAgent>")
-    print(answer)
-    print("\n" + "-" * 60 + "\n")
+        print("\nAgent>")
+        print(answer)
+        print("\n" + "-" * 60 + "\n")
+
+
+if __name__ == "__main__":
+    print("\nTomas Critique Agent")
+    print("Type 'exit' to quit.\n")
+    main()
+
 

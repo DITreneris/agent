@@ -1,5 +1,49 @@
 # Changelog
 
+## 2026-07-01 — v1.6 Import-Safe CLI Entrypoint
+
+### Changed
+
+- Moved the interactive CLI loop behind an explicit `main()` entrypoint.
+- Added an `if __name__ == "__main__": main()` guard so `chat_agent.py` can be imported safely.
+- Removed import-time CLI header printing.
+- Preserved normal CLI behavior for `python chat_agent.py`.
+
+### Added
+
+- Added direct unit tests for `prepare_selected_code_audit()`.
+- Covered valid selected-code preparation.
+- Covered invalid line ranges.
+- Covered maximum 200-line range enforcement.
+- Covered path escape rejection.
+- Covered missing file handling.
+- Covered directory path rejection.
+- Covered start-line beyond file length handling.
+- Covered end-line clamping to file length.
+
+### Verified
+
+- Confirmed `chat_agent.py` compiles.
+- Confirmed `import chat_agent` no longer starts the CLI loop.
+- Confirmed `import chat_agent` no longer prints the CLI header.
+- Confirmed `python chat_agent.py` starts the CLI normally.
+- Confirmed `/help` works in real CLI run.
+- Confirmed `/audit_lines chat_agent.py 196 240` works in real CLI run.
+- Confirmed audit result saved as `#15`.
+- Confirmed `/audit_history 5` shows audit result `#15`.
+- Confirmed `/audit_stats` updated total audits to `15`.
+- Confirmed selected-code preparation tests pass: `8 passed`.
+- Confirmed full test suite passes: `44 passed, 1 warning`.
+
+### Known Limitations
+
+- `/audit_file` remains legacy and unchanged.
+- `/audit_function` still supports top-level Python functions only.
+- `/audit_method` still supports direct class methods only.
+- Nested classes and inherited methods remain out of scope.
+- End lines beyond file length are currently clamped to the file length rather than rejected.
+- The remaining warning comes from `pydantic_ai`, not project code.
+
 ## 2026-06-29 — v1.5 Shared File Selection Refactor
 
 ### Changed
