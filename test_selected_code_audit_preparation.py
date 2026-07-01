@@ -109,8 +109,7 @@ def test_prepare_selected_code_audit_rejects_start_line_beyond_file_length(
             end_line=2,
         )
 
-
-def test_prepare_selected_code_audit_clamps_end_line_to_file_length(
+def test_prepare_selected_code_audit_rejects_end_line_beyond_file_length(
     tmp_path: Path,
 ) -> None:
     file_path = tmp_path / "sample.py"
@@ -120,13 +119,10 @@ def test_prepare_selected_code_audit_clamps_end_line_to_file_length(
         encoding="utf-8",
     )
 
-    prepared = prepare_selected_code_audit(
-        project_root=tmp_path,
-        file_name="sample.py",
-        start_line=1,
-        end_line=10,
-    )
-
-    assert prepared.start_line == 1
-    assert prepared.end_line == 2
-    assert prepared.selected_content == "1: a = 1\n2: b = 2"
+    with pytest.raises(ValueError, match="End line exceeds file length"):
+        prepare_selected_code_audit(
+            project_root=tmp_path,
+            file_name="sample.py",
+            start_line=1,
+            end_line=10,
+        )

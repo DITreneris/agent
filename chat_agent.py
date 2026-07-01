@@ -230,11 +230,12 @@ def prepare_selected_code_audit(
     if start_line > len(lines):
         raise ValueError(f"Start line exceeds file length: {len(lines)} lines")
 
-    normalized_end_line = min(end_line, len(lines))
+    if end_line > len(lines):
+        raise ValueError(f"End line exceeds file length: {len(lines)} lines")
 
     selected_content = "\n".join(
         f"{line_number}: {lines[line_number - 1]}"
-        for line_number in range(start_line, normalized_end_line + 1)
+        for line_number in range(start_line, end_line + 1)
     )
 
     return SelectedCodeAuditPreparation(
@@ -242,7 +243,7 @@ def prepare_selected_code_audit(
         relative_path=file_name,
         selected_content=selected_content,
         start_line=start_line,
-        end_line=normalized_end_line,
+        end_line=end_line,
     )
 
 def run_selected_code_audit(

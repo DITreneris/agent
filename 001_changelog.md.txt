@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-07-01 — v1.7 Strict Selected Range Bounds
+
+### Changed
+
+- Changed selected-code audit preparation to reject `end_line` values beyond the file length.
+- Removed silent end-line clamping behavior.
+- Updated selected-code preparation tests to reflect strict line-bound validation.
+
+### Verified
+
+- Confirmed `chat_agent.py` compiles.
+- Confirmed selected-code preparation tests pass: `8 passed`.
+- Confirmed full test suite passes: `44 passed, 1 warning`.
+- Confirmed valid `/audit_lines chat_agent.py 196 240` works in real CLI run.
+- Confirmed audit result saved as `#16`.
+- Confirmed `/audit_history 5` shows the new audit result.
+- Confirmed `/audit_stats` updated total audits to `16`.
+- Confirmed `/audit_lines chat_agent.py 800 820` rejects out-of-bounds ranges with:
+  `End line exceeds file length: 808 lines`.
+
+### Known Limitations
+
+- `/audit_file` remains legacy and unchanged.
+- `/audit_function` still supports top-level Python functions only.
+- `/audit_method` still supports direct class methods only.
+- Nested classes and inherited methods remain out of scope.
+- The remaining warning comes from `pydantic_ai`, not project code.
+
 ## 2026-07-01 — v1.6 Import-Safe CLI Entrypoint
 
 ### Changed
