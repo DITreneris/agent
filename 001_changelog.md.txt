@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-07-01 — v1.8 Stable Local Audit Tool Baseline
+
+### Changed
+
+- Updated README with stable usage instructions, command reference, verified state, known limitations, and explicit non-goals.
+- Documented the project as a stable local CLI-first audit assistant.
+- Added a future work rule: no new feature work unless driven by repeated real CLI usage friction.
+- Marked the active next feature target as none.
+
+### Verified
+
+- Confirmed current implementation baseline is `v1.7 — Strict Selected Range Bounds`.
+- Confirmed full test suite passes: `44 passed, 1 warning`.
+- Confirmed core CLI workflow has been smoke-tested through `/help`, `/audit_lines`, `/audit_history`, and `/audit_stats`.
+- Confirmed latest saved audit result is `#16`.
+- Confirmed current project status is documented in README.
+
+### Project Status
+
+- Stable local audit tool.
+- No active next feature target.
+- Future work should be driven only by repeated real usage friction.
+
+
 ## 2026-07-01 — v1.7 Strict Selected Range Bounds
 
 ### Changed

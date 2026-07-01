@@ -1,21 +1,51 @@
+# Tomas Critique Agent
 
-Critique Agent
+Local CLI-first code audit assistant built with Python, Pydantic AI, Ollama, and SQLite persistence.
 
-Local CLI-first code critique agent built with Python, Pydantic AI, Ollama, and SQLite persistence.
+The project is intentionally small, local, and focused on practical development-session code audits.
 
-## Current Status
+---
 
-Current baseline: v1.1 — Function-Aware Chunking MVP
+## Stable Baseline
+
+Current stable baseline:
+
+```text
+v1.8 — Stable Local Audit Tool Baseline
+```
+
+Implementation baseline:
+
+```text
+v1.7 — Strict Selected Range Bounds
+```
+
+Latest verified state:
+
+```text
+44 passed, 1 warning
+```
+
+The remaining warning comes from the external `pydantic_ai` dependency, not from project code.
+
+---
+
+## What It Does
 
 The agent can:
 
-- audit selected code line ranges;
-- audit Python functions by name;
-- validate structured audit output;
-- retry once if output is invalid;
-- persist accepted audit results to SQLite;
-- show recent audit history;
-- show basic audit statistics.
+* audit selected manual line ranges;
+* audit top-level Python functions by name;
+* audit direct Python class methods by `ClassName.method_name`;
+* validate audit output into a strict 7-section structure;
+* retry once if the model output is malformed;
+* reject malformed output after a failed retry;
+* persist accepted audit results to SQLite;
+* show recent audit history;
+* show basic audit statistics;
+* protect selected-code prompts with explicit untrusted input boundaries.
+
+---
 
 ## Core Commands
 
@@ -23,29 +53,197 @@ The agent can:
 /help
 /audit_lines <path> <start> <end>
 /audit_function <path> <function_name>
+/audit_method <path> <ClassName.method_name>
 /audit_history [limit]
 /audit_stats
-Example
+```
+
+Additional project/context commands:
+
+```text
+/project
+/project_summary
+/project_files
+/read_file <path>
+/context
+/inspect <path>
+```
+
+Memory commands:
+
+```text
+/memory
+/remember <fact>
+/update_memory <id> | <new content>
+/delete_memory <id>
+/forget <text>
+/clear_memory
+```
+
+Legacy command:
+
+```text
+/audit_file <path>
+```
+
+`/audit_file` remains available but is considered legacy and unreliable for larger files.
+
+---
+
+## Example Usage
+
+Audit a manual line range:
+
+```bash
+/audit_lines chat_agent.py 196 240
+```
+
+Audit a top-level function:
+
+```bash
 /audit_function prompt_builder.py build_file_audit_prompt
-Verified
+```
 
+Audit a direct class method:
 
-## Latest local verification:
+```bash
+/audit_method chat_agent.py SomeClass.some_method
+```
 
-27 passed, 1 warning
+View recent audit results:
 
-The remaining warning comes from the external pydantic_ai dependency.
+```bash
+/audit_history 5
+```
 
-## Roadmap
+View audit statistics:
 
-Next recommended step:
+```bash
+/audit_stats
+```
 
-v1.2 — Extract shared audit execution logic
+---
 
-Do not add dashboards, RAG, embeddings, or multi-agent orchestration yet.
+## Run
+
+```bash
+python chat_agent.py
+```
+
+---
+
+## Test
+
+```bash
+python -m pytest
+```
+
+Latest verified result:
+
+```text
+44 passed, 1 warning
+```
+
+---
+
+## Current Verified Capabilities
+
+### Selected-Code Audits
+
+* Manual line-range audits via `/audit_lines`.
+* Top-level Python function audits via `/audit_function`.
+* Direct Python class method audits via `/audit_method`.
+* Maximum selected audit range: 200 lines.
+* Selected audit ranges must be inside file bounds.
+* Out-of-bounds `end_line` values are rejected with a clear error.
+
+### Output Reliability
+
+* Enforces a deterministic 7-section audit output.
+* Retries once when model output is malformed.
+* Rejects invalid audit output after a failed retry.
+* Separates verified defects, risks, assumptions, and future improvements.
+
+### Persistence
+
+* Validated audits are saved to SQLite.
+* `/audit_history [limit]` shows recent saved audits.
+* `/audit_stats` shows total audits, verdict counts, retry count, and most audited file.
+
+### Prompt Boundary Hardening
+
+* Audited file paths and code content are marked as untrusted.
+* Embedded instructions inside audited code are not followed.
+* Fake markdown headings, fake audit verdicts, and copied required-output headings inside code are guarded against.
+
+### Testability
+
+* `chat_agent.py` is import-safe.
+* Importing `chat_agent.py` no longer starts the CLI loop.
+* `prepare_selected_code_audit()` has direct unit test coverage.
+
+---
+
+## Known Limitations
+
+* `/audit_file` remains legacy and unreliable for larger files.
+* `/audit_function` supports top-level Python functions only.
+* `/audit_method` supports direct class methods only.
+* Nested classes are not supported.
+* Inherited methods are not resolved.
+* Duplicate names in nested scopes remain out of scope.
+* Audit quality still depends on local LLM judgment.
+* The prompt construction is still mostly string-based.
+* The remaining warning comes from `pydantic_ai`, not project code.
+
+---
+
+## Explicit Non-Goals
+
+Do not add unless repeated real CLI usage proves the need:
+
+* web UI;
+* dashboards;
+* embeddings;
+* RAG;
+* vector databases;
+* multi-agent orchestration;
+* autonomous code patching;
+* complex audit analytics;
+* prompt template engine;
+* full repository autonomous review.
+
+---
+
+## Future Work Rule
+
+No new feature work unless it solves repeated friction from real CLI usage.
+
+Future development should be triggered only by observed usage pain, for example:
+
+* `/audit_file` is repeatedly needed and unreliable;
+* nested class methods are repeatedly needed;
+* target discovery becomes a real bottleneck;
+* audit output becomes too generic in repeated real use;
+* SQLite history needs practical filtering after enough real audit data exists.
+
+Until then, the project should remain stable, local, CLI-first, and deliberately small.
+
+---
+
+## Project Status
+
+```text
+Status: Stable local audit tool
+Active next feature target: None
+Recommended next action: Use in real development sessions before adding features
+```
+
+---
 
 ## License
 
 Private / experimental project.
+
 
 
