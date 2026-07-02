@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-07-01 — v1.8.1 Fix Plain Chat After Import-Safe Refactor
+
+### Fixed
+
+- Fixed plain non-command chat messages crashing after the import-safe CLI refactor.
+- Added explicit `global history` inside `main()` so the CLI loop can update shared conversation history correctly.
+
+### Verified
+
+- Confirmed full test suite passes: `44 passed, 1 warning`.
+- Confirmed plain non-command chat messages work in real CLI run.
+- Confirmed `/audit_stats` works after the fix.
+- Confirmed `/audit_history` works after the fix.
+- Confirmed `/audit_file` still runs, but remains legacy and unreliable for larger or complex files.
+
+### Known Limitations
+
+- `/audit_file` remains legacy and can produce generic or inaccurate summaries.
+- Focused selected-code audit commands remain the recommended workflow:
+  - `/audit_lines`
+  - `/audit_function`
+  - `/audit_method`
+
 ## 2026-07-01 — v1.8 Stable Local Audit Tool Baseline
 
 ### Changed

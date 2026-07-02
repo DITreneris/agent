@@ -759,6 +759,8 @@ Return only:
     return None
 
 def main() -> None:
+    global history
+
     while True:
         user_input = input("You> ").strip()
 
