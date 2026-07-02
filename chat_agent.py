@@ -147,6 +147,7 @@ def load_recent_messages(limit: int = 10):
     return [f"{role}: {content}" for role, content in rows]
 
 MAX_HISTORY = 10
+MAX_AUDIT_LINES = 200
 history = load_recent_messages(MAX_HISTORY)
 
 init_memory_db()
@@ -202,8 +203,8 @@ def prepare_selected_code_audit(
     if start_line < 1 or end_line < start_line:
         raise ValueError("Invalid line range.")
 
-    if end_line - start_line + 1 > 200:
-        raise ValueError("Maximum audit range is 200 lines.")
+    if end_line - start_line + 1 > MAX_AUDIT_LINES:
+        raise ValueError(f"Maximum audit range is {MAX_AUDIT_LINES} lines.")
 
     resolved_project_root = project_root.resolve()
     file_path = (resolved_project_root / file_name).resolve()
@@ -264,10 +265,13 @@ def run_selected_code_audit(
     )
 
     if not validated_result.success:
-        error_details = "\n".join(
-            f"- {error}"
-            for error in validated_result.errors
-        )
+        if validated_result.errors:
+            error_details = "\n".join(
+                f"- {error}"
+                for error in validated_result.errors
+            )
+        else:
+            error_details = "- No validation error details were returned."
 
         return (
             "Audit output rejected after one retry.\n"

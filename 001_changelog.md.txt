@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-07-02 — v1.8.3 Validator + Audit Failure Hardening
+
+### Added
+
+- Added an explicit regression test confirming out-of-order audit sections are rejected.
+- Added `MAX_AUDIT_LINES` constant to make the 200-line selected audit limit explicit.
+
+### Changed
+
+- Replaced the hardcoded selected audit range limit with `MAX_AUDIT_LINES`.
+- Improved rejected audit output handling when validation fails without returning detailed errors.
+
+### Verified
+
+- Confirmed syntax check passes: `python -m py_compile chat_agent.py`.
+- Confirmed validator tests pass: `13 passed`.
+- Confirmed selected-code preparation tests pass: `8 passed`.
+- Confirmed audit runner tests pass: `4 passed`.
+- Confirmed full test suite passes: `45 passed, 1 warning`.
+
+
 ## 2026-07-02 — v1.8.2 Repo Hygiene + /audit_file UX Guard
 
 ### Changed

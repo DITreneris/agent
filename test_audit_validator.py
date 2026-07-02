@@ -147,3 +147,31 @@ def test_code_fence_wrapping_is_rejected():
         "Response must start with '1. Bottom line'."
         in result.errors
     )
+
+def test_out_of_order_sections_are_rejected():
+    response = """1. Bottom line
+OK
+
+3. Better option
+OK
+
+2. Direct critique
+OK
+
+4. Next steps
+OK
+
+5. Top 3 pitfalls
+OK
+
+6. Verdict
+GO
+
+7. Confidence
+High
+"""
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert "Required sections are not in the correct order." in result.errors
