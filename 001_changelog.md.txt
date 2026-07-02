@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-07-02 — v1.8.2 Repo Hygiene + /audit_file UX Guard
+
+### Changed
+
+- Deprecated `/audit_file` as an active full-file audit command.
+- `/audit_file` now returns a clear legacy warning instead of running unreliable full-file audits.
+- Updated `/help` to mark `/audit_file` as legacy and direct users to focused audit commands.
+- Updated unknown-command help output to include the focused audit workflow consistently.
+- Fixed missing slash in the unknown-command `/inspect <path>` help entry.
+
+### Fixed
+
+- Prevented misleading full-file audit output from damaging user trust.
+- Prevented `/audit` from recommending the legacy `/audit_file` workflow.
+
+### Verified
+
+- Confirmed syntax check passes: `python -m py_compile chat_agent.py`.
+- Confirmed full test suite passes: `44 passed, 1 warning`.
+- Confirmed `/audit_file chat_agent.py` returns a legacy warning instead of running a full-file audit.
+- Confirmed `/help` shows `/audit_file` as legacy.
+- Confirmed unknown-command help shows `/audit_function` and `/audit_method`.
+- Confirmed `/audit` no longer recommends `/audit_file`.
+
 ## 2026-07-01 — v1.8.1 Fix Plain Chat After Import-Safe Refactor
 
 ### Fixed

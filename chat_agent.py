@@ -387,7 +387,7 @@ def handle_memory_command(user_input: str):
             "/context\n"
             "/inspect <path>\n"
             "/audit\n"
-            "/audit_file <path>\n"
+            "/audit_file <path>  [legacy: use /audit_lines, /audit_function, or /audit_method]\n"
             "/audit_lines <path> <start> <end>\n"
             "/audit_function <path> <function_name>\n"
             "/audit_method <path> <ClassName.method_name>\n"
@@ -673,32 +673,28 @@ def handle_memory_command(user_input: str):
         if not file_name:
             return "Usage: /audit_file <path>"
 
-        project_root = PROJECT_ROOT.resolve()
-        file_path = (project_root / file_name).resolve()
-
-        try:
-            file_path.relative_to(project_root)
-        except ValueError:
-            return f"Access denied: {file_name}"
-
-        if not file_path.exists():
-            return f"File not found: {file_name}"
-
-        if not file_path.is_file():
-            return f"Path is not a file: {file_name}"
-
-        file_content = read_project_file(file_path)
-
-        full_prompt = build_file_audit_prompt(
-            file_name,
-            file_content,
+        return (
+            "/audit_file is legacy and unreliable for larger or complex files.\n\n"
+            "Use focused audit commands instead:\n\n"
+            "/audit_lines <path> <start> <end>\n"
+            "/audit_function <path> <function_name>\n"
+            "/audit_method <path> <ClassName.method_name>"
         )
-        return run_ollama_audit(full_prompt)
 
     if text == "/audit":
         audit_prompt = build_system_prompt(
             """
-Audit this local AI agent project.
+Audit this local AI agent project at a high level.
+
+Important:
+- Do not recommend /audit_file.
+- /audit_file is legacy and unreliable for larger or complex files.
+- Do not invent function names.
+- If exact code-level evidence is needed, recommend /project_files first or ask the user to choose a focused audit target.
+- Recommend focused audit commands only:
+  - /audit_lines <path> <start> <end>
+  - /audit_function <path> <function_name>
+  - /audit_method <path> <ClassName.method_name>
 
 Return only:
 1. What works
@@ -748,10 +744,12 @@ Return only:
             "/project_files\n"
             "/read_file <path>\n"
             "/context\n"
-            "inspect <path>\n"
+            "/inspect <path>\n"
             "/audit\n"
-            "/audit_file <path>\n"
+            "/audit_file <path>  [legacy: use /audit_lines, /audit_function, or /audit_method]\n"
             "/audit_lines <path> <start> <end>\n"
+            "/audit_function <path> <function_name>\n"
+            "/audit_method <path> <ClassName.method_name>\n"
             "/audit_history [limit]\n"
             "/audit_stats"
       )
