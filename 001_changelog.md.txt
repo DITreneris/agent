@@ -1,5 +1,67 @@
 # Changelog
 
+## 2026-07-02 — v1.8.3 Cross-Repo Manual Review Validation
+
+### Summary
+
+Performed a real manual workflow test of Tomas Critique Agent against a separate project: `~/ladder`.
+
+The test confirmed that Critique Agent is no longer only a same-repo audit utility. It can operate as a cross-repo local second reviewer when launched from another project root.
+
+### Verified
+
+- Agent correctly detected the external project root: `/home/tomas/ladder`.
+- Agent indexed 61 project files.
+- Manual focused audits were performed using `/audit_lines`.
+- Six audits were completed and persisted successfully.
+- All six audits passed structured validation.
+- No retry was required.
+- Audit history and stats worked in the external project context.
+- Most audited file: `packages/api/app/routes/runs.py`.
+
+### Audit Results
+
+Audited ranges:
+
+- `packages/api/app/routes/runs.py` lines 127–154
+- `packages/api/app/routes/runs.py` lines 34–124
+- `packages/api/app/routes/runs.py` lines 157–188
+- `packages/api/app/main.py` lines 42–95
+- `packages/api/app/tools/_submit_atomic.py` lines 1–71
+- `packages/api/app/tools/_plausibility.py` lines 1–83
+
+All audit results returned:
+
+- Verdict: `GO_WITH_NOTES`
+- Retry used: `false`
+
+### Practical Outcome
+
+The agent produced one materially useful action from six audits: a risk around RPC failure classification in `_submit_atomic.py`.
+
+The issue was human-reviewed, checked against existing tests, and converted into regression coverage.
+
+Outcome:
+
+- Added 2 regression tests.
+- Full test suite passed: 67 passed.
+- Changes were committed and pushed.
+
+### Product Learning
+
+Critique Agent is not an automatic bug fixer.
+
+Its current best role is:
+
+```text
+local second reviewer
+→ risk spotting
+→ test coverage prompting
+→ regression check discovery
+→ human-filtered decision support
+
+
+
 ## 2026-07-02 — v1.8.3 Validator + Audit Failure Hardening
 
 ### Added
