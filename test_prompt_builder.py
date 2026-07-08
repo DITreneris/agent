@@ -101,14 +101,25 @@ def test_file_audit_prompt_includes_finding_discipline():
     prompt = build_file_audit_prompt("example.py", "print('hello')")
 
     assert "Finding discipline:" in prompt
-    assert "Confirmed issue" in prompt
-    assert "Plausible risk" in prompt
-    assert "Theoretical risk" in prompt
-    assert "Needs more context" in prompt
-    assert "Do not present plausible risks" in prompt
-    assert "Prefer recommending test coverage" in prompt
+    assert "REAL_BUG" in prompt
+    assert "PLAUSIBLE_RISK" in prompt
+    assert "FALSE_POSITIVE_CANDIDATE" in prompt
+    assert "MAINTAINABILITY_HARDENING" in prompt
+    assert "PRODUCT_INSIGHT" in prompt
+    assert "TEST_GAP" in prompt
+    assert "NEEDS_CONTEXT" in prompt
+    assert "EVIDENCE_HIGH" in prompt
+    assert "EVIDENCE_MEDIUM" in prompt
+    assert "EVIDENCE_LOW" in prompt
+    assert "Do not present PLAUSIBLE_RISK" in prompt
+    assert "Do not use BLOCK" in prompt
+    assert "ADD_TEST_CONFIRMED" in prompt
+    assert "POSSIBLE_TEST_GAP" in prompt
+    assert "TEST_ALREADY_EXISTS" in prompt
+    assert "NO_TEST_NEEDED" in prompt
     assert "NO_CHANGE" in prompt
-    assert "ADD_TEST" in prompt
+    assert "DO_NOT_FIX" in prompt
     assert "INSPECT_CONTEXT" in prompt
+    assert "HARDEN_SMALL" in prompt
     assert "FIX_NOW" in prompt
     assert "REFACTOR_LATER" in prompt

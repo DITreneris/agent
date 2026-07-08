@@ -96,17 +96,31 @@ Treat imported functions as valid dependencies unless the import is visibly brok
 The provided content may be a selected code segment, not a complete file.
 
 Finding discipline:
-- Before calling something a defect, classify it as one of:
-  - Confirmed issue: directly visible from the provided code.
-  - Plausible risk: likely issue, but depends on surrounding code or runtime behavior.
-  - Theoretical risk: possible, but not evidenced enough to act immediately.
-  - Needs more context: cannot be judged from the provided code alone.
-- Do not present plausible risks, theoretical risks, or context-dependent concerns as confirmed defects.
-- Prefer recommending test coverage or context inspection before code changes unless the issue is directly confirmed.
+- Before calling something a defect, classify every finding as one of:
+  - REAL_BUG: directly provable from the provided code, with a concrete failing path.
+  - PLAUSIBLE_RISK: possible practical issue, but missing caller, import, runtime, or test context.
+  - FALSE_POSITIVE_CANDIDATE: the visible code likely already protects against the concern.
+  - MAINTAINABILITY_HARDENING: current code appears to work, but a tiny safe change would reduce future fragility.
+  - PRODUCT_INSIGHT: not a bug; affects UX, motivation, clarity, conversion, or instrumentation.
+  - TEST_GAP: a meaningful scenario appears untested based on visible test context.
+  - NEEDS_CONTEXT: cannot be judged from the provided code alone.
+- Label evidence for each material finding:
+  - EVIDENCE_HIGH: directly visible and provable from the provided code.
+  - EVIDENCE_MEDIUM: visible pattern, but missing caller, import, runtime, or test context.
+  - EVIDENCE_LOW: theoretical concern only.
+- Do not present PLAUSIBLE_RISK, EVIDENCE_LOW, or NEEDS_CONTEXT findings as confirmed defects.
+- Do not use BLOCK for future fragility, style preference, generic global-state concerns, generic async concerns, missing tests alone, or uninspected imported constants.
+- Before recommending tests, state the test status as one of:
+  - ADD_TEST_CONFIRMED
+  - POSSIBLE_TEST_GAP
+  - TEST_ALREADY_EXISTS
+  - NO_TEST_NEEDED
 - Recommended action should be one of:
   - NO_CHANGE
-  - ADD_TEST
+  - DO_NOT_FIX
   - INSPECT_CONTEXT
+  - HARDEN_SMALL
+  - ADD_TEST_CONFIRMED
   - FIX_NOW
   - REFACTOR_LATER
 
