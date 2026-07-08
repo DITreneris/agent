@@ -1,5 +1,87 @@
 # Changelog
 
+## 2026-07-08 — v1.9 Audit Judgment Calibration
+
+### Added
+
+- Added explicit audit finding classification labels:
+  - `REAL_BUG`
+  - `PLAUSIBLE_RISK`
+  - `FALSE_POSITIVE_CANDIDATE`
+  - `MAINTAINABILITY_HARDENING`
+  - `PRODUCT_INSIGHT`
+  - `TEST_GAP`
+  - `NEEDS_CONTEXT`
+- Added explicit evidence-level labels:
+  - `EVIDENCE_HIGH`
+  - `EVIDENCE_MEDIUM`
+  - `EVIDENCE_LOW`
+- Added required audit metadata labels in section 2:
+  - `Classification:`
+  - `Evidence:`
+  - `Why:`
+  - `Missing context:`
+- Added required audit metadata labels in section 4:
+  - `Recommended action:`
+  - `Test status:`
+  - `Reason:`
+
+### Changed
+
+- Calibrated the selected-code audit prompt to distinguish confirmed bugs from plausible risks, hardening opportunities, false-positive candidates, product insights, test gaps, and missing-context findings.
+- Tightened `BLOCK` verdict guidance so it is reserved for directly provable current runtime crashes, security/data-loss bugs, test-breaking defects, or workflow-blocking boundary violations.
+- Changed test recommendation guidance from reflexive `ADD_TEST` suggestions to calibrated test-status labels:
+  - `ADD_TEST_CONFIRMED`
+  - `POSSIBLE_TEST_GAP`
+  - `TEST_ALREADY_EXISTS`
+  - `NO_TEST_NEEDED`
+- Added guidance to prefer `INSPECT_CONTEXT` when findings depend on imported constants, helpers, callers, runtime state, or test files that are not visible.
+- Updated confidence guidance:
+  - `High` only when a finding is directly provable from visible code.
+  - `Medium` or `Low` when the finding depends on missing imports, callers, runtime state, or test context.
+- Updated the retry repair prompt so malformed audit outputs are rewritten with the required v1.9 metadata labels.
+
+### Fixed
+
+- Prevented audit outputs from being accepted when section 2 lacks calibrated finding metadata.
+- Prevented audit outputs from being accepted when section 4 lacks calibrated next-step metadata.
+- Reduced over-severe audit behavior where missing context could previously produce overly strong findings.
+- Reduced blind refactor/test recommendations for imported constants whose definitions are not visible.
+- Fixed prompt wording that allowed the model to leak instruction text such as “and explain why” into audit output.
+
+### Verified
+
+- Confirmed syntax check passes: `python -m py_compile chat_agent.py`.
+- Confirmed audit runner tests pass: `4 passed`.
+- Confirmed audit validator tests pass: `13 passed`.
+- Confirmed prompt builder tests pass: `8 passed`.
+- Confirmed full test suite passes: `49 passed, 1 warning`.
+- Confirmed v1.9 branch merged into `main` with fast-forward merge.
+- Confirmed `main` pushed to GitHub at commit `0f3f116`.
+- Re-ran external `ladder` smoke test:
+  - `/audit_lines apps/mini-app/src/lib/game-over-copy.ts 90 174`
+- Confirmed the `ladder` audit now returns calibrated metadata:
+  - `Classification`
+  - `Evidence`
+  - `Missing context`
+  - `Recommended action`
+  - `Test status`
+  - `GO_WITH_NOTES`
+  - `Medium` confidence
+
+### Result
+
+- Critique Agent now enforces audit judgment calibration through prompt rules, validator checks, and retry repair.
+- The tool no longer only asks the model to be disciplined; it rejects outputs that do not follow the calibrated review contract.
+
+### Known Limitations
+
+- The model may still produce low-value or generic findings, but they are now forced into explicit classification and evidence categories.
+- Missing-context findings may still be somewhat conservative.
+- `/audit_file` remains legacy and is not part of the recommended focused audit workflow.
+
+
+
 ## 2026-07-02 — v1.8.3 Cross-Repo Manual Review Validation
 
 ### Summary
