@@ -132,3 +132,9 @@ def test_file_audit_prompt_includes_finding_discipline():
     assert "Do not recommend ADD_TEST_CONFIRMED" in prompt
     assert "directly provable current runtime crash" in prompt
     assert "uninspected imported constants" in prompt
+    assert "If no material finding exists, still include:" in prompt
+    assert "Classification: FALSE_POSITIVE_CANDIDATE or NEEDS_CONTEXT" in prompt
+    assert "Evidence: EVIDENCE_HIGH / EVIDENCE_MEDIUM / EVIDENCE_LOW" in prompt
+    assert "Missing context: none or named context" in prompt
+    assert "POSSIBLE_TEST_GAP must not be phrased as a confirmed requirement" in prompt
+    assert 'Use "consider adding only if existing tests do not cover this"' in prompt

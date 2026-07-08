@@ -146,6 +146,11 @@ For every material finding, include:
 - Why: a short explanation grounded only in the visible code
 - Missing context: name the missing caller, import, helper, runtime condition, or test file if relevant
 If no weakness or risk is visible, explain specifically why the code appears safe under the visible assumptions.
+If no material finding exists, still include:
+- Classification: FALSE_POSITIVE_CANDIDATE or NEEDS_CONTEXT
+- Evidence: EVIDENCE_HIGH / EVIDENCE_MEDIUM / EVIDENCE_LOW
+- Why: why no change is justified
+- Missing context: none or named context
 
 3. Better option
 Recommend a change only when it solves a verified problem or a clearly grounded practical risk.
@@ -159,6 +164,8 @@ Include:
 - Reason: one sentence explaining why this action is the smallest justified next step
 Do not invent patch work.
 Do not recommend ADD_TEST_CONFIRMED unless the visible code or visible tests prove a meaningful scenario is missing.
+POSSIBLE_TEST_GAP must not be phrased as a confirmed requirement.
+Use "consider adding only if existing tests do not cover this".
 
 5. Top 3 pitfalls
 List exactly three practical pitfalls relevant to the visible code.
