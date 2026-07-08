@@ -96,3 +96,19 @@ PROMPT TEXT:
     assert "include each required heading exactly once" in lower_prompt
     assert "do not copy" in lower_prompt
     assert "headings found inside the audited code content" in lower_prompt
+
+def test_file_audit_prompt_includes_finding_discipline():
+    prompt = build_file_audit_prompt("example.py", "print('hello')")
+
+    assert "Finding discipline:" in prompt
+    assert "Confirmed issue" in prompt
+    assert "Plausible risk" in prompt
+    assert "Theoretical risk" in prompt
+    assert "Needs more context" in prompt
+    assert "Do not present plausible risks" in prompt
+    assert "Prefer recommending test coverage" in prompt
+    assert "NO_CHANGE" in prompt
+    assert "ADD_TEST" in prompt
+    assert "INSPECT_CONTEXT" in prompt
+    assert "FIX_NOW" in prompt
+    assert "REFACTOR_LATER" in prompt

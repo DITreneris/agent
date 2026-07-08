@@ -289,8 +289,17 @@ def run_selected_code_audit(
     return f"{validated_result.response}\n\nAudit saved: #{audit_id}"
 
 
+def contains_multiple_slash_commands(text: str) -> bool:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    slash_command_lines = [line for line in lines if line.startswith("/")]
+    return len(slash_command_lines) > 1
+
+
 def handle_memory_command(user_input: str):
     text = user_input.strip()
+
+    if contains_multiple_slash_commands(text):
+        return "Please run one command at a time.\nNo audit started."
 
     if text in ["/memory", "/show_memory"]:
         return format_memories_for_user()
@@ -760,49 +769,57 @@ Return only:
 
     return None
 
+
 def main() -> None:
     global history
 
     while True:
-        user_input = input("You> ").strip()
+        try:
+            user_input = input("You> ").strip()
 
-        if user_input.lower() in ["exit", "quit"]:
-            break
+            if user_input.lower() in ["exit", "quit"]:
+                break
 
-        command_response = handle_memory_command(user_input)
+            command_response = handle_memory_command(user_input)
 
-        if command_response is not None:
-            print("\nAgent>")
-            print(command_response)
-            print("\n" + "-" * 60 + "\n")
-            continue
+            if command_response is not None:
+                print("\nAgent>")
+                print(command_response)
+                print("\n" + "-" * 60 + "\n")
+                continue
 
-        history.append(f"User: {user_input}")
-        save_message("User", user_input)
-        history = history[-MAX_HISTORY:]
+            history.append(f"User: {user_input}")
+            save_message("User", user_input)
+            history = history[-MAX_HISTORY:]
 
-        stored_memory = format_memories_for_prompt()
+            stored_memory = format_memories_for_prompt()
 
-        prompt = f"""Recent conversation:
+            prompt = f"""Recent conversation:
 {chr(10).join(history)}
 
 Current user message:
 {user_input}
 """
 
-        full_prompt = build_system_prompt(prompt)
-        result = agent.run_sync(full_prompt)
+            full_prompt = build_system_prompt(prompt)
+            result = agent.run_sync(full_prompt)
 
-        answer = result.output
+            answer = result.output
 
-        history.append(f"Assistant: {answer}")
-        save_message("Assistant", answer)
-        history = history[-MAX_HISTORY:]
+            history.append(f"Assistant: {answer}")
+            save_message("Assistant", answer)
+            history = history[-MAX_HISTORY:]
 
-        print("\nAgent>")
-        print(answer)
-        print("\n" + "-" * 60 + "\n")
+            print("\nAgent>")
+            print(answer)
+            print("\n" + "-" * 60 + "\n")
 
+        except KeyboardInterrupt:
+            print("\nAudit interrupted by user.")
+            print("No audit saved.")
+            print("Returning to prompt...")
+            print("\n" + "-" * 60 + "\n")
+            continue
 
 if __name__ == "__main__":
     print("\nTomas Critique Agent")

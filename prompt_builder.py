@@ -95,6 +95,21 @@ Mapping 1-based user line numbers to a 0-based Python list with lines[line_numbe
 Treat imported functions as valid dependencies unless the import is visibly broken.
 The provided content may be a selected code segment, not a complete file.
 
+Finding discipline:
+- Before calling something a defect, classify it as one of:
+  - Confirmed issue: directly visible from the provided code.
+  - Plausible risk: likely issue, but depends on surrounding code or runtime behavior.
+  - Theoretical risk: possible, but not evidenced enough to act immediately.
+  - Needs more context: cannot be judged from the provided code alone.
+- Do not present plausible risks, theoretical risks, or context-dependent concerns as confirmed defects.
+- Prefer recommending test coverage or context inspection before code changes unless the issue is directly confirmed.
+- Recommended action should be one of:
+  - NO_CHANGE
+  - ADD_TEST
+  - INSPECT_CONTEXT
+  - FIX_NOW
+  - REFACTOR_LATER
+
 Audit usefulness rules:
 - Look for practical correctness, maintainability, edge-case, state-handling, error-handling, CLI workflow, and user-facing failure risks.
 - Every audit must identify the most likely practical failure mode, or explicitly explain why no practical failure mode is visible.
