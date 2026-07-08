@@ -1,18 +1,22 @@
 from audit_validator import validate_audit_output
 
-
 VALID_RESPONSE = """
 1. Bottom line
 The function is operational.
 
 2. Direct critique
-No blocking defect is visible.
+Classification: FALSE_POSITIVE_CANDIDATE
+Evidence: EVIDENCE_HIGH
+Why: No blocking defect is visible in the provided code.
+Missing context: none
 
 3. Better option
 Keep the current implementation.
 
 4. Next steps
-Run regression tests.
+Recommended action: NO_CHANGE
+Test status: NO_TEST_NEEDED
+Reason: No change is justified because no visible defect is present.
 
 5. Top 3 pitfalls
 1. Model false positives.
@@ -43,7 +47,10 @@ def test_empty_response_is_rejected():
 
 def test_missing_section_is_rejected():
     response = VALID_RESPONSE.replace(
-        "4. Next steps\nRun regression tests.\n\n",
+        "4. Next steps\n"
+        "Recommended action: NO_CHANGE\n"
+        "Test status: NO_TEST_NEEDED\n"
+        "Reason: No change is justified because no visible defect is present.\n\n",
         "",
     )
 
@@ -67,7 +74,10 @@ def test_content_before_first_section_is_rejected():
 
 def test_empty_section_is_rejected():
     response = VALID_RESPONSE.replace(
-        "4. Next steps\nRun regression tests.",
+        "4. Next steps\n"
+        "Recommended action: NO_CHANGE\n"
+        "Test status: NO_TEST_NEEDED\n"
+        "Reason: No change is justified because no visible defect is present.",
         "4. Next steps",
     )
 

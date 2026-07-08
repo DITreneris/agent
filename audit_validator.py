@@ -16,6 +16,18 @@ FORBIDDEN_PHRASES = [
     "Additional analysis",
 ]
 
+SECTION_2_REQUIRED_LABELS = [
+    "Classification:",
+    "Evidence:",
+    "Why:",
+    "Missing context:",
+]
+
+SECTION_4_REQUIRED_LABELS = [
+    "Recommended action:",
+    "Test status:",
+    "Reason:",
+]
 
 @dataclass
 class AuditValidationResult:
@@ -47,6 +59,15 @@ def _extract_section_content(
 
     return response[content_start:end].strip()
 
+def _require_labels_in_section(
+    content: str,
+    labels: list[str],
+    section: str,
+    errors: list[str],
+) -> None:
+    for label in labels:
+        if label not in content:
+            errors.append(f"Missing required label in {section}: '{label}'.")
 
 def validate_audit_output(response: str) -> AuditValidationResult:
     """Validate that an audit response follows the required output contract."""
@@ -113,6 +134,32 @@ def validate_audit_output(response: str) -> AuditValidationResult:
 
         if not content:
             errors.append(f"Section is empty: '{section}'.")
+
+    if "2. Direct critique" in cleaned and "3. Better option" in cleaned:
+        direct_critique = _extract_section_content(
+            cleaned,
+            "2. Direct critique",
+            "3. Better option",
+        )
+        _require_labels_in_section(
+            direct_critique,
+            SECTION_2_REQUIRED_LABELS,
+            "2. Direct critique",
+            errors,
+        )
+
+    if "4. Next steps" in cleaned and "5. Top 3 pitfalls" in cleaned:
+        next_steps = _extract_section_content(
+            cleaned,
+            "4. Next steps",
+            "5. Top 3 pitfalls",
+        )
+        _require_labels_in_section(
+            next_steps,
+            SECTION_4_REQUIRED_LABELS,
+            "4. Next steps",
+            errors,
+        )
 
     # Reject known unwanted phrases.
     cleaned_lower = cleaned.lower()
