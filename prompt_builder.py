@@ -109,6 +109,7 @@ Finding discipline:
   - EVIDENCE_MEDIUM: visible pattern, but missing caller, import, runtime, or test context.
   - EVIDENCE_LOW: theoretical concern only.
 - Do not present PLAUSIBLE_RISK, EVIDENCE_LOW, or NEEDS_CONTEXT findings as confirmed defects.
+- If imported constants or helpers are not visible, do not recommend refactoring them or adding tests against impossible shapes such as null/undefined unless the visible code shows they can actually be null/undefined. Prefer INSPECT_CONTEXT.
 - Do not use BLOCK for future fragility, style preference, generic global-state concerns, generic async concerns, missing tests alone, or uninspected imported constants.
 - Before recommending tests, state the test status as one of:
   - ADD_TEST_CONFIRMED
@@ -145,6 +146,7 @@ For every material finding, include:
 - Evidence: one of EVIDENCE_HIGH, EVIDENCE_MEDIUM, EVIDENCE_LOW
 - Why: a short explanation grounded only in the visible code
 - Missing context: name the missing caller, import, helper, runtime condition, or test file if relevant
+Use the exact labels "Classification:", "Evidence:", "Why:", and "Missing context:" for each finding. Do not replace them with bold text, parenthetical labels, or prose-only summaries.
 If no weakness or risk is visible, explain specifically why the code appears safe under the visible assumptions.
 If no material finding exists, still include:
 - Classification: FALSE_POSITIVE_CANDIDATE or NEEDS_CONTEXT
@@ -166,6 +168,7 @@ Do not invent patch work.
 Do not recommend ADD_TEST_CONFIRMED unless the visible code or visible tests prove a meaningful scenario is missing.
 POSSIBLE_TEST_GAP must not be phrased as a confirmed requirement.
 Use "consider adding only if existing tests do not cover this".
+Use the exact labels "Recommended action:", "Test status:", and "Reason:". Do not use "Action:" or "Test:".
 
 5. Top 3 pitfalls
 List exactly three practical pitfalls relevant to the visible code.
@@ -185,6 +188,8 @@ Return exactly one of:
 High
 Medium
 Low
+Use High only when the finding is directly provable from visible code.
+Use Medium or Low when the finding depends on missing imports, callers, runtime state, or test context.
 
 Output rules:
 -- Start exactly with: 1. Bottom line

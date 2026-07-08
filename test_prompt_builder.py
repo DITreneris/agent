@@ -138,3 +138,10 @@ def test_file_audit_prompt_includes_finding_discipline():
     assert "Missing context: none or named context" in prompt
     assert "POSSIBLE_TEST_GAP must not be phrased as a confirmed requirement" in prompt
     assert 'Use "consider adding only if existing tests do not cover this"' in prompt
+    assert "If imported constants or helpers are not visible" in prompt
+    assert "Prefer INSPECT_CONTEXT" in prompt
+    assert 'Use the exact labels "Classification:", "Evidence:", "Why:", and "Missing context:"' in prompt
+    assert 'Use the exact labels "Recommended action:", "Test status:", and "Reason:"' in prompt
+    assert 'Do not use "Action:" or "Test:"' in prompt
+    assert "Use High only when the finding is directly provable from visible code" in prompt
+    assert "Use Medium or Low when the finding depends on missing imports" in prompt
