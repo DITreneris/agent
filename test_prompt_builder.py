@@ -123,3 +123,12 @@ def test_file_audit_prompt_includes_finding_discipline():
     assert "HARDEN_SMALL" in prompt
     assert "FIX_NOW" in prompt
     assert "REFACTOR_LATER" in prompt
+    assert "For every material finding, include:" in prompt
+    assert "- Classification: one of" in prompt
+    assert "- Evidence: one of" in prompt
+    assert "- Missing context:" in prompt
+    assert "- Recommended action: one of" in prompt
+    assert "- Test status: one of" in prompt
+    assert "Do not recommend ADD_TEST_CONFIRMED" in prompt
+    assert "directly provable current runtime crash" in prompt
+    assert "uninspected imported constants" in prompt

@@ -140,6 +140,11 @@ State the most important verified finding.
 
 2. Direct critique
 List concrete weaknesses, non-blocking risks, or important assumptions visible in the provided code.
+For every material finding, include:
+- Classification: one of REAL_BUG, PLAUSIBLE_RISK, FALSE_POSITIVE_CANDIDATE, MAINTAINABILITY_HARDENING, PRODUCT_INSIGHT, TEST_GAP, NEEDS_CONTEXT
+- Evidence: one of EVIDENCE_HIGH, EVIDENCE_MEDIUM, EVIDENCE_LOW
+- Why: a short explanation grounded only in the visible code
+- Missing context: name the missing caller, import, helper, runtime condition, or test file if relevant
 If no weakness or risk is visible, explain specifically why the code appears safe under the visible assumptions.
 
 3. Better option
@@ -147,8 +152,13 @@ Recommend a change only when it solves a verified problem or a clearly grounded 
 Otherwise state that no code change is currently justified and explain why.
 
 4. Next steps
-Give one smallest practical next action: change code, add a test, inspect a named dependency, run a named command, or accept no change with a specific reason.
+Give one smallest practical next action.
+Include:
+- Recommended action: one of NO_CHANGE, DO_NOT_FIX, INSPECT_CONTEXT, HARDEN_SMALL, ADD_TEST_CONFIRMED, FIX_NOW, REFACTOR_LATER
+- Test status: one of ADD_TEST_CONFIRMED, POSSIBLE_TEST_GAP, TEST_ALREADY_EXISTS, NO_TEST_NEEDED
+- Reason: one sentence explaining why this action is the smallest justified next step
 Do not invent patch work.
+Do not recommend ADD_TEST_CONFIRMED unless the visible code or visible tests prove a meaningful scenario is missing.
 
 5. Top 3 pitfalls
 List exactly three practical pitfalls relevant to the visible code.
@@ -160,7 +170,8 @@ Return exactly one of:
 Verdict guidance:
 - GO: use only when no code change is justified and no meaningful practical risk is visible.
 - GO_WITH_NOTES: use when the code can proceed, but there are assumptions, edge cases, maintainability risks, test gaps, or non-blocking issues worth tracking.
-- BLOCK: use only when the visible code contains a concrete runtime, security, data-loss, or workflow-blocking defect.
+- BLOCK: use only when the visible code contains a directly provable current runtime crash, security/data-loss bug, test-breaking defect, or workflow-blocking boundary violation. Do not use BLOCK for future fragility, style preference, missing tests alone, generic global-state concerns, generic async concerns, or uninspected imported constants.
+
 
 7. Confidence
 Return exactly one of:
