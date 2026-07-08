@@ -154,7 +154,7 @@ If no material finding exists, still include:
 
 3. Better option
 Recommend a change only when it solves a verified problem or a clearly grounded practical risk.
-Otherwise state that no code change is currently justified and explain why.
+If no change is justified, write a natural sentence explaining why no code change is needed. Do not copy this instruction verbatim.
 
 4. Next steps
 Give one smallest practical next action.
