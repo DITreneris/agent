@@ -1,5 +1,39 @@
 # Changelog
 
+## 2026-07-09 — v1.9.1 Calibration Contradiction Hardening
+
+### Added
+
+- Added validator regression tests for audit calibration contradictions:
+  - `BLOCK` verdict without `REAL_BUG` + `EVIDENCE_HIGH`.
+  - `EVIDENCE_LOW` combined with `High` confidence.
+  - `NEEDS_CONTEXT` combined with `High` confidence.
+- Added calibration contract validation helpers in `audit_validator.py`.
+
+### Changed
+
+- Hardened audit output validation so clearly contradictory calibrated outputs are rejected instead of persisted.
+- Extended the validator beyond format compliance into minimal judgment-contract enforcement.
+
+### Fixed
+
+- Prevented `BLOCK` verdicts unless the audit contains at least one `REAL_BUG` finding with `EVIDENCE_HIGH`.
+- Prevented `EVIDENCE_LOW` findings from being accepted with `High` confidence.
+- Prevented `NEEDS_CONTEXT` findings from being accepted with `High` confidence.
+- Reduced risk of saving prompt-boundary-confused audits as valid results.
+
+### Verified
+
+- Confirmed syntax check passes: `python -m py_compile audit_validator.py`.
+- Confirmed audit validator tests pass: `16 passed`.
+- Confirmed full test suite passes: `52 passed, 1 warning`.
+
+### Result
+
+- Critique Agent now rejects a class of internally contradictory audit outputs that v1.9 still allowed.
+- The model may still produce weak or confused audits, but the validator no longer accepts the clearest calibration contradictions.
+
+
 ## 2026-07-08 — v1.9 Audit Judgment Calibration
 
 ### Added

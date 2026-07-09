@@ -185,3 +185,54 @@ High
 
     assert result.valid is False
     assert "Required sections are not in the correct order." in result.errors
+
+def test_block_requires_real_bug_with_high_evidence():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: NEEDS_CONTEXT",
+    ).replace(
+        "Evidence: EVIDENCE_HIGH",
+        "Evidence: EVIDENCE_LOW",
+    ).replace(
+        "6. Verdict\nGO",
+        "6. Verdict\nBLOCK",
+    ).replace(
+        "7. Confidence\nHigh.",
+        "7. Confidence\nHigh",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "BLOCK verdict requires at least one REAL_BUG finding with EVIDENCE_HIGH."
+        in result.errors
+    )
+
+def test_low_evidence_cannot_have_high_confidence():
+    response = VALID_RESPONSE.replace(
+        "Evidence: EVIDENCE_HIGH",
+        "Evidence: EVIDENCE_LOW",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "EVIDENCE_LOW findings cannot use High confidence."
+        in result.errors
+    )
+
+def test_needs_context_cannot_have_high_confidence():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: NEEDS_CONTEXT",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "NEEDS_CONTEXT findings cannot use High confidence."
+        in result.errors
+    )

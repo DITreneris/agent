@@ -29,6 +29,19 @@ SECTION_4_REQUIRED_LABELS = [
     "Reason:",
 ]
 
+BLOCK_REQUIRES_ERROR = (
+    "BLOCK verdict requires at least one REAL_BUG finding with EVIDENCE_HIGH."
+)
+
+LOW_EVIDENCE_HIGH_CONFIDENCE_ERROR = (
+    "EVIDENCE_LOW findings cannot use High confidence."
+)
+
+NEEDS_CONTEXT_HIGH_CONFIDENCE_ERROR = (
+    "NEEDS_CONTEXT findings cannot use High confidence."
+)
+
+
 @dataclass
 class AuditValidationResult:
     valid: bool
@@ -68,6 +81,48 @@ def _require_labels_in_section(
     for label in labels:
         if label not in content:
             errors.append(f"Missing required label in {section}: '{label}'.")
+
+def _extract_verdict(response: str) -> str:
+    verdict_content = _extract_section_content(
+        response,
+        "6. Verdict",
+        "7. Confidence",
+    )
+
+    return verdict_content.strip()
+
+
+def _extract_confidence(response: str) -> str:
+    confidence_content = _extract_section_content(
+        response,
+        "7. Confidence",
+        None,
+    )
+
+    return confidence_content.strip().rstrip(".")
+
+
+def _validate_calibration_contract(
+    cleaned: str,
+    errors: list[str],
+) -> None:
+    verdict = _extract_verdict(cleaned)
+    confidence = _extract_confidence(cleaned)
+
+    has_real_bug_high_evidence = (
+        "Classification: REAL_BUG" in cleaned
+        and "Evidence: EVIDENCE_HIGH" in cleaned
+    )
+
+    if verdict == "BLOCK" and not has_real_bug_high_evidence:
+        errors.append(BLOCK_REQUIRES_ERROR)
+
+    if "Evidence: EVIDENCE_LOW" in cleaned and confidence == "High":
+        errors.append(LOW_EVIDENCE_HIGH_CONFIDENCE_ERROR)
+
+    if "Classification: NEEDS_CONTEXT" in cleaned and confidence == "High":
+        errors.append(NEEDS_CONTEXT_HIGH_CONFIDENCE_ERROR)
+
 
 def validate_audit_output(response: str) -> AuditValidationResult:
     """Validate that an audit response follows the required output contract."""
@@ -160,6 +215,8 @@ def validate_audit_output(response: str) -> AuditValidationResult:
             "4. Next steps",
             errors,
         )
+
+    _validate_calibration_contract(cleaned, errors)
 
     # Reject known unwanted phrases.
     cleaned_lower = cleaned.lower()
