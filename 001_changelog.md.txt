@@ -27,6 +27,10 @@
 - Confirmed syntax check passes: `python -m py_compile audit_validator.py`.
 - Confirmed audit validator tests pass: `16 passed`.
 - Confirmed full test suite passes: `52 passed, 1 warning`.
+- Confirmed real CLI smoke test rejects a contradictory prompt-builder audit after one retry:
+  - `/audit_function prompt_builder.py build_file_audit_prompt`
+  - Rejected because `BLOCK` lacked `REAL_BUG` + `EVIDENCE_HIGH`.
+  - Rejected because `EVIDENCE_LOW` and `NEEDS_CONTEXT` were combined with `High` confidence.
 
 ### Result
 
