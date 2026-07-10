@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-07-10 — v1.9.2 Telegram Cross-Repo Evaluation
+
+### Tested
+
+- Evaluated Critique Agent against the external `telegram` repository.
+- Verified baseline: 219 tests passed and 234 posts, polls, and images aligned.
+- Completed 5 focused audit attempts:
+  - 4 accepted as `GO_WITH_NOTES`
+  - 1 rejected after retry due to `EVIDENCE_LOW` with `High` confidence
+
+### Findings
+
+- No confirmed production bugs were found.
+- Repeated weaknesses included missing caller context, exception-handling false positives, and low-value maintainability recommendations.
+- The validator correctly rejected an overconfident low-evidence audit.
+- Rejected attempts are currently missing from audit history and statistics.
+
+### Decision
+
+- Stop auditing the Telegram repository.
+- Prioritize v1.10 evaluation observability and human feedback.
+
+
 ## 2026-07-09 — v1.9.1 Calibration Contradiction Hardening
 
 ### Added

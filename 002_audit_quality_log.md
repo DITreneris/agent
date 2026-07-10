@@ -278,3 +278,40 @@ Repeated failure signal:
 
 v1.9.1 hardening implemented for calibration contradictions. Continue measuring audit usefulness before adding broader prompt-boundary changes.
 
+## 2026-07-10 — Telegram Repository Field Test
+
+### Baseline
+
+- Repository: `/home/tomas/telegram`
+- Commit: `2442884`
+- Tests: `219 passed`
+- Content audit: 234/234 posts, polls, images, and journey IDs aligned
+- Working tree: clean
+
+### Results
+
+| Audit target | Human assessment |
+|---|---|
+| `_send_scheduled_item_with_retry` | False positive caused by missing caller context |
+| `run_scheduled_delivery` | Low-value maintainability hardening |
+| `save_atomic` | False positive; cleanup already implemented |
+| `Orchestrator.record_delivered` | Requested context, but proposed harmful local exception handling |
+| `Orchestrator._next_after` | Rejected after retry due to evidence-confidence mismatch |
+
+### Main learning
+
+The validator was more reliable than the model's engineering judgment.
+
+Recurring weaknesses:
+
+1. Functions were judged without caller or contract context.
+2. Test gaps were confused with code defects.
+3. Maintainability suggestions were produced when no real defect was visible.
+4. Rejected attempts disappeared from audit history and statistics.
+
+### Next improvement
+
+v1.10 should add rejected-attempt persistence, complete attempt statistics, retry metrics, human verdicts, and caller/test context.
+
+No changes were made to the Telegram repository.
+
