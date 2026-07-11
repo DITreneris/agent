@@ -91,7 +91,7 @@ def run_validated_audit(
 
     return ValidatedAuditResult(
         success=False,
-        response=None,
+        response=second_response.strip(),
         errors=second_validation.errors,
         retry_used=True,
     )

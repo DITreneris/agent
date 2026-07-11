@@ -62,7 +62,7 @@ def test_second_invalid_response_is_rejected():
     )
 
     assert result.success is False
-    assert result.response is None
+    assert result.response == "Invalid response"
     assert result.errors
     assert result.retry_used is True
     assert len(calls) == 2
@@ -81,5 +81,6 @@ def test_retry_is_not_run_more_than_once():
     )
 
     assert result.success is False
+    assert result.response == "Still invalid"
     assert result.retry_used is True
     assert len(calls) == 2

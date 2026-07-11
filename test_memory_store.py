@@ -1,5 +1,5 @@
 import sqlite3
-
+import pytest
 import memory_store
 
 
@@ -159,10 +159,10 @@ def test_get_audit_stats_empty_database(tmp_path, monkeypatch):
     stats = memory_store.get_audit_stats()
 
     assert stats["total"] == 0
+    assert stats["status_counts"] == {}
     assert stats["verdict_counts"] == {}
     assert stats["retries_used"] == 0
     assert stats["most_audited_file"] is None
-
 
 def test_get_audit_stats_counts_saved_audits(tmp_path, monkeypatch):
     test_db = tmp_path / "test_memory.db"
@@ -243,12 +243,91 @@ Medium
         retry_used=True,
     )
 
+    memory_store.create_audit_result(
+        file_path="orchestrator.py",
+        start_line=43,
+        end_line=46,
+        response="Invalid audit response",
+        retry_used=True,
+        status="rejected",
+        validation_errors=[
+            "EVIDENCE_LOW findings cannot use High confidence."
+        ],
+    )
+
     stats = memory_store.get_audit_stats()
 
-    assert stats["total"] == 3
+    assert stats["total"] == 4
+    assert stats["status_counts"] == {
+        "accepted": 3,
+        "rejected": 1,
+    }
     assert stats["verdict_counts"] == {
         "GO": 2,
         "FIX": 1,
     }
-    assert stats["retries_used"] == 2
+    assert stats["retries_used"] == 3
     assert stats["most_audited_file"] == "chat_agent.py"
+
+def test_create_rejected_audit_result(tmp_path, monkeypatch):
+    test_db = tmp_path / "test_memory.db"
+
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    audit_id = memory_store.create_audit_result(
+        file_path="orchestrator.py",
+        start_line=43,
+        end_line=46,
+        response="Invalid audit response",
+        retry_used=True,
+        status="rejected",
+        validation_errors=[
+            "EVIDENCE_LOW findings cannot use High confidence."
+        ],
+    )
+
+    conn = sqlite3.connect(test_db)
+    row = conn.execute(
+        """
+        SELECT
+            status,
+            verdict,
+            confidence,
+            retry_used,
+            attempt_count,
+            validation_errors,
+            response
+        FROM audit_results
+        WHERE id = ?
+        """,
+        (audit_id,),
+    ).fetchone()
+
+    assert row is not None
+    assert row[0] == "rejected"
+    assert row[1] == ""
+    assert row[2] == ""
+    assert row[3] == 1
+    assert row[4] == 2
+    assert row[5] == "EVIDENCE_LOW findings cannot use High confidence."
+    assert row[6] == "Invalid audit response"
+
+def test_create_audit_result_rejects_invalid_status(tmp_path, monkeypatch):
+    test_db = tmp_path / "test_memory.db"
+
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    with pytest.raises(
+        ValueError,
+        match="status must be 'accepted' or 'rejected'",
+    ):
+        memory_store.create_audit_result(
+            file_path="chat_agent.py",
+            start_line=1,
+            end_line=5,
+            response="Invalid response",
+            retry_used=False,
+            status="unknown",
+        )

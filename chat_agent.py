@@ -265,6 +265,16 @@ def run_selected_code_audit(
     )
 
     if not validated_result.success:
+        audit_id = create_audit_result(
+            file_path=file_name,
+            start_line=start_line,
+            end_line=end_line,
+            response=validated_result.response or "",
+            retry_used=validated_result.retry_used,
+            status="rejected",
+            validation_errors=validated_result.errors,
+        )
+
         if validated_result.errors:
             error_details = "\n".join(
                 f"- {error}"
@@ -275,6 +285,7 @@ def run_selected_code_audit(
 
         return (
             "Audit output rejected after one retry.\n"
+            f"Rejected attempt saved: #{audit_id}\n"
             f"{error_details}"
         )
 
@@ -449,13 +460,30 @@ def handle_memory_command(user_input: str):
 
         for row in rows:
             retry_used = "true" if row["retry_used"] else "false"
-            lines.append(
-                f"#{row['id']} | {row['verdict']} | confidence: {row['confidence']} | "
-                f"{row['file_path']}:{row['start_line']}-{row['end_line']} | "
-                f"retry: {retry_used} | {row['created_at']}"
-            )
+
+            if row["status"] == "rejected":
+                lines.append(
+                    f"#{row['id']} | REJECTED | "
+                    f"{row['file_path']}:{row['start_line']}-{row['end_line']} | "
+                    f"retry: {retry_used} | attempts: {row['attempt_count']} | "
+                    f"{row['created_at']}"
+                )
+
+                if row["validation_errors"]:
+                    lines.append(
+                        f"  Reason: {row['validation_errors']}"
+                    )
+            else:
+                lines.append(
+                    f"#{row['id']} | {row['verdict']} | "
+                    f"confidence: {row['confidence']} | "
+                    f"{row['file_path']}:{row['start_line']}-{row['end_line']} | "
+                    f"retry: {retry_used} | attempts: {row['attempt_count']} | "
+                    f"{row['created_at']}"
+                )
 
         return "\n".join(lines)
+
 
     if text == "/audit_stats":
         stats = get_audit_stats()
@@ -465,7 +493,9 @@ def handle_memory_command(user_input: str):
 
         lines = [
             "Audit stats:",
-            f"Total audits: {stats['total']}",
+            f"Total attempts: {stats['total']}",
+            f"Accepted: {stats['status_counts'].get('accepted', 0)}",
+            f"Rejected: {stats['status_counts'].get('rejected', 0)}",
         ]
 
         for verdict, count in stats["verdict_counts"].items():

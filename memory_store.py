@@ -27,15 +27,60 @@ def init_memory_db():
             file_path TEXT NOT NULL,
             start_line INTEGER NOT NULL,
             end_line INTEGER NOT NULL,
-            verdict TEXT NOT NULL,
-            confidence TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'accepted',
+            verdict TEXT NOT NULL DEFAULT '',
+            confidence TEXT NOT NULL DEFAULT '',
             retry_used INTEGER NOT NULL DEFAULT 0,
+            attempt_count INTEGER NOT NULL DEFAULT 1,
+            validation_errors TEXT NOT NULL DEFAULT '',
             response TEXT NOT NULL,
             created_at TEXT NOT NULL
         )
         """)
 
+        audit_columns = {
+            row["name"]
+            for row in conn.execute(
+                "PRAGMA table_info(audit_results)"
+            ).fetchall()
+        }
+
+        if "status" not in audit_columns:
+            conn.execute(
+                """
+                ALTER TABLE audit_results
+                ADD COLUMN status TEXT NOT NULL DEFAULT 'accepted'
+                """
+            )
+
+        if "attempt_count" not in audit_columns:
+            conn.execute(
+                """
+                ALTER TABLE audit_results
+                ADD COLUMN attempt_count INTEGER NOT NULL DEFAULT 1
+                """
+            )
+
+        if "validation_errors" not in audit_columns:
+            conn.execute(
+                """
+                ALTER TABLE audit_results
+                ADD COLUMN validation_errors TEXT NOT NULL DEFAULT ''
+                """
+            )
+
+        conn.execute(
+            """
+            UPDATE audit_results
+            SET attempt_count = CASE
+                WHEN retry_used = 1 THEN 2
+                ELSE 1
+            END
+            """
+        )
+
         conn.commit()
+
 
 def create_memory(content: str, memory_type: str = "fact") -> int:
     now = datetime.now(UTC).isoformat()
@@ -80,7 +125,7 @@ def get_memory(memory_id: int):
 
 def update_memory(memory_id: int, new_content: str) -> bool:
     now = datetime.now(UTC).isoformat()
-    
+
     with get_connection() as conn:
         row = conn.execute(
             """
@@ -202,11 +247,23 @@ def create_audit_result(
     end_line: int,
     response: str,
     retry_used: bool,
+    status: str = "accepted",
+    validation_errors: list[str] | None = None,
 ) -> int:
-    now = datetime.now(UTC).isoformat()    
+    now = datetime.now(UTC).isoformat()
 
     verdict = extract_audit_verdict(response)
     confidence = extract_audit_confidence(response)
+
+    if status not in {"accepted", "rejected"}:
+        raise ValueError("status must be 'accepted' or 'rejected'")
+
+    attempt_count = 2 if retry_used else 1
+    validation_errors_text = "\n".join(validation_errors or [])
+
+    if status == "rejected":
+        verdict = ""
+        confidence = ""
 
     with get_connection() as conn:
         cursor = conn.execute(
@@ -215,27 +272,34 @@ def create_audit_result(
                 file_path,
                 start_line,
                 end_line,
+                status,
                 verdict,
                 confidence,
                 retry_used,
+                attempt_count,
+                validation_errors,
                 response,
                 created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 file_path,
                 start_line,
                 end_line,
+                status,
                 verdict,
                 confidence,
                 int(retry_used),
+                attempt_count,
+                validation_errors_text,
                 response,
                 now,
             ),
         )
         conn.commit()
         return cursor.lastrowid
+
 
 def get_recent_audit_results(limit: int = 10):
     if limit < 1:
@@ -252,9 +316,12 @@ def get_recent_audit_results(limit: int = 10):
                 file_path,
                 start_line,
                 end_line,
+                status,
                 verdict,
                 confidence,
                 retry_used,
+                attempt_count,
+                validation_errors,
                 created_at
             FROM audit_results
             ORDER BY id DESC
@@ -264,6 +331,7 @@ def get_recent_audit_results(limit: int = 10):
         )
         return cursor.fetchall()
 
+
 def get_audit_stats():
     with get_connection() as conn:
         total = conn.execute(
@@ -272,6 +340,15 @@ def get_audit_stats():
             FROM audit_results
             """
         ).fetchone()["count"]
+
+        status_rows = conn.execute(
+            """
+            SELECT status, COUNT(*) AS count
+            FROM audit_results
+            GROUP BY status
+            ORDER BY status ASC
+            """
+        ).fetchall()
 
         verdict_rows = conn.execute(
             """
@@ -302,9 +379,14 @@ def get_audit_stats():
 
     return {
         "total": total,
+        "status_counts": {
+            row["status"]: row["count"]
+            for row in status_rows
+        },
         "verdict_counts": {
             row["verdict"]: row["count"]
             for row in verdict_rows
+            if row["verdict"]
         },
         "retries_used": retries_used,
         "most_audited_file": (
