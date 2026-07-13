@@ -83,3 +83,336 @@ def test_run_selected_code_audit_saves_rejected_attempt(
         "EVIDENCE_LOW findings cannot use High confidence."
     )
     assert row[4] == "Invalid audit response"
+
+def test_rate_audit_command_saves_feedback(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    audit_id = memory_store.create_audit_result(
+        file_path="example.py",
+        start_line=1,
+        end_line=10,
+        response=(
+            "6. Verdict\nGO_WITH_NOTES\n"
+            "7. Confidence\nMedium"
+        ),
+        retry_used=False,
+    )
+
+    result = handle_memory_command(
+        f"/rate_audit {audit_id} PARTIALLY_USEFUL "
+        "INVESTIGATED_NO_CHANGE | "
+        "Caller context confirmed the behavior"
+    )
+
+    assert result == (
+        f"Audit #{audit_id} rated:\n"
+        "Label: PARTIALLY_USEFUL\n"
+        "Outcome: INVESTIGATED_NO_CHANGE\n"
+        "Note: Caller context confirmed the behavior"
+    )
+
+    conn = sqlite3.connect(test_db)
+    conn.row_factory = sqlite3.Row
+
+    row = conn.execute(
+        """
+        SELECT
+            human_label,
+            human_outcome,
+            human_note,
+            reviewed_at
+        FROM audit_results
+        WHERE id = ?
+        """,
+        (audit_id,),
+    ).fetchone()
+
+    conn.close()
+
+    assert row is not None
+    assert row["human_label"] == "PARTIALLY_USEFUL"
+    assert row["human_outcome"] == "INVESTIGATED_NO_CHANGE"
+    assert row["human_note"] == (
+        "Caller context confirmed the behavior"
+    )
+    assert row["reviewed_at"]
+
+
+def test_rate_audit_command_accepts_label_only(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    audit_id = memory_store.create_audit_result(
+        file_path="example.py",
+        start_line=1,
+        end_line=10,
+        response=(
+            "6. Verdict\nGO_WITH_NOTES\n"
+            "7. Confidence\nMedium"
+        ),
+        retry_used=False,
+    )
+
+    result = handle_memory_command(
+        f"/rate_audit {audit_id} LOW_VALUE"
+    )
+
+    assert result == (
+        f"Audit #{audit_id} rated:\n"
+        "Label: LOW_VALUE"
+    )
+
+    conn = sqlite3.connect(test_db)
+    conn.row_factory = sqlite3.Row
+
+    row = conn.execute(
+        """
+        SELECT
+            human_label,
+            human_outcome,
+            human_note
+        FROM audit_results
+        WHERE id = ?
+        """,
+        (audit_id,),
+    ).fetchone()
+
+    conn.close()
+
+    assert row["human_label"] == "LOW_VALUE"
+    assert row["human_outcome"] is None
+    assert row["human_note"] is None
+
+
+def test_rate_audit_command_accepts_note_without_outcome(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    audit_id = memory_store.create_audit_result(
+        file_path="example.py",
+        start_line=1,
+        end_line=10,
+        response=(
+            "6. Verdict\nGO_WITH_NOTES\n"
+            "7. Confidence\nMedium"
+        ),
+        retry_used=False,
+    )
+
+    result = handle_memory_command(
+        f"/rate_audit {audit_id} FALSE_POSITIVE | "
+        "Caller already handles the exception"
+    )
+
+    assert result == (
+        f"Audit #{audit_id} rated:\n"
+        "Label: FALSE_POSITIVE\n"
+        "Note: Caller already handles the exception"
+    )
+
+    conn = sqlite3.connect(test_db)
+    conn.row_factory = sqlite3.Row
+
+    row = conn.execute(
+        """
+        SELECT
+            human_label,
+            human_outcome,
+            human_note
+        FROM audit_results
+        WHERE id = ?
+        """,
+        (audit_id,),
+    ).fetchone()
+
+    conn.close()
+
+    assert row["human_label"] == "FALSE_POSITIVE"
+    assert row["human_outcome"] is None
+    assert row["human_note"] == (
+        "Caller already handles the exception"
+    )
+
+
+def test_rate_audit_command_rejects_missing_arguments():
+    result = handle_memory_command("/rate_audit")
+
+    assert result == (
+        "Usage: /rate_audit <id> <label> "
+        "[outcome] [| note]"
+    )
+
+
+def test_rate_audit_command_rejects_invalid_id():
+    result = handle_memory_command(
+        "/rate_audit abc USEFUL"
+    )
+
+    assert result == "Audit ID must be a number."
+
+
+def test_rate_audit_command_rejects_unknown_audit(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    result = handle_memory_command(
+        "/rate_audit 9999 USEFUL"
+    )
+
+    assert result == "Unknown audit ID: 9999"
+
+
+def test_rate_audit_command_rejects_invalid_label():
+    result = handle_memory_command(
+        "/rate_audit 1 HELPFUL"
+    )
+
+    assert result == (
+        "Invalid label: HELPFUL\n"
+        "Allowed labels: FALSE_POSITIVE, LOW_VALUE, "
+        "NEEDS_MORE_CONTEXT, PARTIALLY_USEFUL, USEFUL"
+    )
+
+
+def test_rate_audit_command_rejects_invalid_outcome():
+    result = handle_memory_command(
+        "/rate_audit 1 USEFUL FIXED_EVERYTHING"
+    )
+
+    assert result == (
+        "Invalid outcome: FIXED_EVERYTHING\n"
+        "Allowed outcomes: CODE_CHANGED, "
+        "INVESTIGATED_NO_CHANGE, NO_ACTION, TEST_ADDED"
+    )
+
+
+def test_evaluation_stats_command_shows_human_feedback(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    audit_1 = memory_store.create_audit_result(
+        file_path="first.py",
+        start_line=1,
+        end_line=10,
+        response=(
+            "6. Verdict\nGO_WITH_NOTES\n"
+            "7. Confidence\nMedium"
+        ),
+        retry_used=False,
+    )
+
+    audit_2 = memory_store.create_audit_result(
+        file_path="second.py",
+        start_line=1,
+        end_line=10,
+        response=(
+            "6. Verdict\nGO_WITH_NOTES\n"
+            "7. Confidence\nMedium"
+        ),
+        retry_used=False,
+    )
+
+    memory_store.create_audit_result(
+        file_path="third.py",
+        start_line=1,
+        end_line=10,
+        response=(
+            "6. Verdict\nGO_WITH_NOTES\n"
+            "7. Confidence\nMedium"
+        ),
+        retry_used=False,
+    )
+
+    memory_store.rate_audit(
+        audit_1,
+        "USEFUL",
+        "TEST_ADDED",
+    )
+
+    memory_store.rate_audit(
+        audit_2,
+        "FALSE_POSITIVE",
+        "NO_ACTION",
+    )
+
+    result = handle_memory_command("/evaluation_stats")
+
+    assert result == (
+        "Human evaluation stats:\n"
+        "\n"
+        "Total audits: 3\n"
+        "Reviewed: 2\n"
+        "Not reviewed: 1\n"
+        "\n"
+        "Labels:\n"
+        "USEFUL: 1 (50.0%)\n"
+        "PARTIALLY_USEFUL: 0 (0.0%)\n"
+        "LOW_VALUE: 0 (0.0%)\n"
+        "FALSE_POSITIVE: 1 (50.0%)\n"
+        "NEEDS_MORE_CONTEXT: 0 (0.0%)\n"
+        "\n"
+        "Outcomes:\n"
+        "TEST_ADDED: 1\n"
+        "CODE_CHANGED: 0\n"
+        "INVESTIGATED_NO_CHANGE: 0\n"
+        "NO_ACTION: 1"
+    )
+
+
+def test_evaluation_stats_command_handles_no_reviews(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    memory_store.create_audit_result(
+        file_path="example.py",
+        start_line=1,
+        end_line=10,
+        response=(
+            "6. Verdict\nGO_WITH_NOTES\n"
+            "7. Confidence\nMedium"
+        ),
+        retry_used=False,
+    )
+
+    result = handle_memory_command("/evaluation_stats")
+
+    assert result == (
+        "Human evaluation stats:\n"
+        "\n"
+        "Total audits: 1\n"
+        "Reviewed: 0\n"
+        "Not reviewed: 1\n"
+        "\n"
+        "No audits have been reviewed yet."
+    )

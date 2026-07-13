@@ -1,5 +1,50 @@
 # Changelog
 
+## 2026-07-13 — v1.11 Human Evaluation Loop
+
+### Added
+
+- Added human audit feedback fields:
+  - `human_label`
+  - `human_outcome`
+  - `human_note`
+  - `reviewed_at`
+- Added safe migration support for existing audit databases.
+- Added `/rate_audit <id> <label> [outcome] [| note]`.
+- Added `/evaluation_stats`.
+- Added human feedback visibility to `/audit_history`.
+- Added validation for supported human labels and outcomes.
+- Added regression coverage for persistence, CLI parsing, evaluation statistics, and audit history integration.
+
+### Human Labels
+
+- `USEFUL`
+- `PARTIALLY_USEFUL`
+- `LOW_VALUE`
+- `FALSE_POSITIVE`
+- `NEEDS_MORE_CONTEXT`
+
+### Outcomes
+
+- `TEST_ADDED`
+- `CODE_CHANGED`
+- `INVESTIGATED_NO_CHANGE`
+- `NO_ACTION`
+
+### Result
+
+Critique Agent can now measure whether structurally valid audits are actually useful, low-value, false-positive, or limited by missing context.
+
+### Validation
+
+- 73 tests passed.
+- Real CLI smoke tests passed for:
+  - `/rate_audit`
+  - `/evaluation_stats`
+  - `/audit_history`
+- Existing audit history remained intact after database migration.
+
+
 ## 2026-07-11 — v1.10 Evaluation Observability
 
 ### Added

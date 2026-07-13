@@ -3,6 +3,20 @@ from datetime import datetime, UTC
 
 DB_PATH = "memory.db"
 
+VALID_HUMAN_LABELS = {
+    "USEFUL",
+    "PARTIALLY_USEFUL",
+    "LOW_VALUE",
+    "FALSE_POSITIVE",
+    "NEEDS_MORE_CONTEXT",
+}
+
+VALID_HUMAN_OUTCOMES = {
+    "NO_ACTION",
+    "CODE_CHANGED",
+    "TEST_ADDED",
+    "INVESTIGATED_NO_CHANGE",
+}
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -33,6 +47,10 @@ def init_memory_db():
             retry_used INTEGER NOT NULL DEFAULT 0,
             attempt_count INTEGER NOT NULL DEFAULT 1,
             validation_errors TEXT NOT NULL DEFAULT '',
+            human_label TEXT NOT NULL DEFAULT 'NOT_REVIEWED',
+            human_outcome TEXT,
+            human_note TEXT,
+            reviewed_at TEXT,
             response TEXT NOT NULL,
             created_at TEXT NOT NULL
         )
@@ -69,6 +87,38 @@ def init_memory_db():
                 """
             )
 
+        if "human_label" not in audit_columns:
+            conn.execute(
+                """
+                ALTER TABLE audit_results
+                ADD COLUMN human_label TEXT NOT NULL DEFAULT 'NOT_REVIEWED'
+                """
+            )
+
+        if "human_outcome" not in audit_columns:
+            conn.execute(
+                """
+                ALTER TABLE audit_results
+                ADD COLUMN human_outcome TEXT
+                """
+            )
+
+        if "human_note" not in audit_columns:
+            conn.execute(
+                """
+                ALTER TABLE audit_results
+                ADD COLUMN human_note TEXT
+                """
+            )
+
+        if "reviewed_at" not in audit_columns:
+            conn.execute(
+                """
+                ALTER TABLE audit_results
+                ADD COLUMN reviewed_at TEXT
+                """
+            )
+
         conn.execute(
             """
             UPDATE audit_results
@@ -80,6 +130,9 @@ def init_memory_db():
         )
 
         conn.commit()
+
+
+
 
 
 def create_memory(content: str, memory_type: str = "fact") -> int:
@@ -301,6 +354,56 @@ def create_audit_result(
         return cursor.lastrowid
 
 
+def rate_audit(
+    audit_id: int,
+    human_label: str,
+    human_outcome: str | None = None,
+    human_note: str | None = None,
+) -> bool:
+    human_label = human_label.strip().upper()
+
+    if human_label not in VALID_HUMAN_LABELS:
+        raise ValueError(
+            "Invalid human label. Allowed labels: "
+            + ", ".join(sorted(VALID_HUMAN_LABELS))
+        )
+
+    if human_outcome is not None:
+        human_outcome = human_outcome.strip().upper()
+
+        if human_outcome not in VALID_HUMAN_OUTCOMES:
+            raise ValueError(
+                "Invalid human outcome. Allowed outcomes: "
+                + ", ".join(sorted(VALID_HUMAN_OUTCOMES))
+            )
+
+    normalized_note = human_note.strip() if human_note else None
+    reviewed_at = datetime.now(UTC).isoformat()
+
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE audit_results
+            SET
+                human_label = ?,
+                human_outcome = ?,
+                human_note = ?,
+                reviewed_at = ?
+            WHERE id = ?
+            """,
+            (
+                human_label,
+                human_outcome,
+                normalized_note,
+                reviewed_at,
+                audit_id,
+            ),
+        )
+        conn.commit()
+
+    return cursor.rowcount > 0
+
+
 def get_recent_audit_results(limit: int = 10):
     if limit < 1:
         limit = 10
@@ -322,6 +425,8 @@ def get_recent_audit_results(limit: int = 10):
                 retry_used,
                 attempt_count,
                 validation_errors,
+                human_label,
+                human_outcome,
                 created_at
             FROM audit_results
             ORDER BY id DESC
@@ -394,4 +499,55 @@ def get_audit_stats():
             if most_audited_row
             else None
         ),
+    }
+
+def get_human_evaluation_stats():
+    with get_connection() as conn:
+        total = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM audit_results
+            """
+        ).fetchone()[0]
+
+        reviewed = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM audit_results
+            WHERE human_label != 'NOT_REVIEWED'
+            """
+        ).fetchone()[0]
+
+        label_rows = conn.execute(
+            """
+            SELECT human_label, COUNT(*) AS count
+            FROM audit_results
+            WHERE human_label != 'NOT_REVIEWED'
+            GROUP BY human_label
+            ORDER BY human_label
+            """
+        ).fetchall()
+
+        outcome_rows = conn.execute(
+            """
+            SELECT human_outcome, COUNT(*) AS count
+            FROM audit_results
+            WHERE human_outcome IS NOT NULL
+            GROUP BY human_outcome
+            ORDER BY human_outcome
+            """
+        ).fetchall()
+
+    return {
+        "total": total,
+        "reviewed": reviewed,
+        "not_reviewed": total - reviewed,
+        "label_counts": {
+            row["human_label"]: row["count"]
+            for row in label_rows
+        },
+        "outcome_counts": {
+            row["human_outcome"]: row["count"]
+            for row in outcome_rows
+        },
     }

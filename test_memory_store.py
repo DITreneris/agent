@@ -2,6 +2,16 @@ import sqlite3
 import pytest
 import memory_store
 
+from memory_store import (
+    VALID_HUMAN_LABELS,
+    VALID_HUMAN_OUTCOMES,
+    create_audit_result,
+    get_connection,
+    init_memory_db,
+    rate_audit,
+    get_human_evaluation_stats,
+)
+
 
 def test_create_audit_result(tmp_path, monkeypatch):
     test_db = tmp_path / "test_memory.db"
@@ -331,3 +341,291 @@ def test_create_audit_result_rejects_invalid_status(tmp_path, monkeypatch):
             retry_used=False,
             status="unknown",
         )
+
+
+def test_rate_audit_saves_human_feedback(tmp_path, monkeypatch):
+    db_path = tmp_path / "test_memory.db"
+    monkeypatch.setattr("memory_store.DB_PATH", str(db_path))
+
+    init_memory_db()
+
+    audit_id = create_audit_result(
+        file_path="example.py",
+        start_line=1,
+        end_line=10,
+        response=(
+            "6. Verdict\nGO_WITH_NOTES\n"
+            "7. Confidence\nMedium"
+        ),
+        retry_used=False,
+    )
+
+    updated = rate_audit(
+        audit_id,
+        "useful",
+        "test_added",
+        "  Added regression coverage.  ",
+    )
+
+    assert updated is True
+
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                human_label,
+                human_outcome,
+                human_note,
+                reviewed_at
+            FROM audit_results
+            WHERE id = ?
+            """,
+            (audit_id,),
+        ).fetchone()
+
+    assert row["human_label"] == "USEFUL"
+    assert row["human_outcome"] == "TEST_ADDED"
+    assert row["human_note"] == "Added regression coverage."
+    assert row["reviewed_at"]
+
+
+def test_rate_audit_allows_optional_outcome_and_note(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "test_memory.db"
+    monkeypatch.setattr("memory_store.DB_PATH", str(db_path))
+
+    init_memory_db()
+
+    audit_id = create_audit_result(
+        file_path="example.py",
+        start_line=1,
+        end_line=10,
+        response=(
+            "6. Verdict\nGO_WITH_NOTES\n"
+            "7. Confidence\nMedium"
+        ),
+        retry_used=False,
+    )
+
+    updated = rate_audit(
+        audit_id,
+        "LOW_VALUE",
+    )
+
+    assert updated is True
+
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                human_label,
+                human_outcome,
+                human_note,
+                reviewed_at
+            FROM audit_results
+            WHERE id = ?
+            """,
+            (audit_id,),
+        ).fetchone()
+
+    assert row["human_label"] == "LOW_VALUE"
+    assert row["human_outcome"] is None
+    assert row["human_note"] is None
+    assert row["reviewed_at"]
+
+
+def test_rate_audit_returns_false_for_unknown_audit(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "test_memory.db"
+    monkeypatch.setattr("memory_store.DB_PATH", str(db_path))
+
+    init_memory_db()
+
+    assert rate_audit(9999, "USEFUL") is False
+
+
+def test_rate_audit_rejects_invalid_label(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "test_memory.db"
+    monkeypatch.setattr("memory_store.DB_PATH", str(db_path))
+
+    init_memory_db()
+
+    try:
+        rate_audit(1, "HELPFUL")
+    except ValueError as error:
+        assert "Invalid human label" in str(error)
+    else:
+        raise AssertionError("Expected ValueError")
+
+
+def test_rate_audit_rejects_invalid_outcome(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "test_memory.db"
+    monkeypatch.setattr("memory_store.DB_PATH", str(db_path))
+
+    init_memory_db()
+
+    try:
+        rate_audit(
+            1,
+            "USEFUL",
+            "FIXED_EVERYTHING",
+        )
+    except ValueError as error:
+        assert "Invalid human outcome" in str(error)
+    else:
+        raise AssertionError("Expected ValueError")
+
+
+def test_rate_audit_can_replace_existing_feedback(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "test_memory.db"
+    monkeypatch.setattr("memory_store.DB_PATH", str(db_path))
+
+    init_memory_db()
+
+    audit_id = create_audit_result(
+        file_path="example.py",
+        start_line=1,
+        end_line=10,
+        response=(
+            "6. Verdict\nGO_WITH_NOTES\n"
+            "7. Confidence\nMedium"
+        ),
+        retry_used=False,
+    )
+
+    rate_audit(
+        audit_id,
+        "PARTIALLY_USEFUL",
+        "INVESTIGATED_NO_CHANGE",
+        "Initial review",
+    )
+
+    rate_audit(
+        audit_id,
+        "FALSE_POSITIVE",
+        "NO_ACTION",
+        "Caller handles the exception",
+    )
+
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                human_label,
+                human_outcome,
+                human_note,
+                reviewed_at
+            FROM audit_results
+            WHERE id = ?
+            """,
+            (audit_id,),
+        ).fetchone()
+
+    assert row["human_label"] == "FALSE_POSITIVE"
+    assert row["human_outcome"] == "NO_ACTION"
+    assert row["human_note"] == "Caller handles the exception"
+    assert row["reviewed_at"]
+
+
+def test_get_human_evaluation_stats_counts_feedback(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "test_memory.db"
+    monkeypatch.setattr("memory_store.DB_PATH", str(db_path))
+
+    init_memory_db()
+
+    audit_1 = create_audit_result(
+        file_path="first.py",
+        start_line=1,
+        end_line=10,
+        response=(
+            "6. Verdict\nGO_WITH_NOTES\n"
+            "7. Confidence\nMedium"
+        ),
+        retry_used=False,
+    )
+
+    audit_2 = create_audit_result(
+        file_path="second.py",
+        start_line=1,
+        end_line=10,
+        response=(
+            "6. Verdict\nGO_WITH_NOTES\n"
+            "7. Confidence\nMedium"
+        ),
+        retry_used=False,
+    )
+
+    create_audit_result(
+        file_path="third.py",
+        start_line=1,
+        end_line=10,
+        response=(
+            "6. Verdict\nGO_WITH_NOTES\n"
+            "7. Confidence\nMedium"
+        ),
+        retry_used=False,
+    )
+
+    rate_audit(
+        audit_1,
+        "USEFUL",
+        "TEST_ADDED",
+    )
+
+    rate_audit(
+        audit_2,
+        "FALSE_POSITIVE",
+        "NO_ACTION",
+    )
+
+    stats = get_human_evaluation_stats()
+
+    assert stats["total"] == 3
+    assert stats["reviewed"] == 2
+    assert stats["not_reviewed"] == 1
+
+    assert stats["label_counts"] == {
+        "FALSE_POSITIVE": 1,
+        "USEFUL": 1,
+    }
+
+    assert stats["outcome_counts"] == {
+        "NO_ACTION": 1,
+        "TEST_ADDED": 1,
+    }
+
+
+def test_get_human_evaluation_stats_handles_empty_database(
+    tmp_path,
+    monkeypatch,
+):
+    db_path = tmp_path / "test_memory.db"
+    monkeypatch.setattr("memory_store.DB_PATH", str(db_path))
+
+    init_memory_db()
+
+    stats = get_human_evaluation_stats()
+
+    assert stats == {
+        "total": 0,
+        "reviewed": 0,
+        "not_reviewed": 0,
+        "label_counts": {},
+        "outcome_counts": {},
+    }

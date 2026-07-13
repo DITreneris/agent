@@ -33,6 +33,10 @@ from memory_store import (
     create_audit_result,
     get_recent_audit_results,
     get_audit_stats,
+    rate_audit,
+    VALID_HUMAN_LABELS,
+    VALID_HUMAN_OUTCOMES,
+    get_human_evaluation_stats,
 )
 
 client = AsyncOpenAI(
@@ -417,7 +421,9 @@ def handle_memory_command(user_input: str):
             "/audit_method <path> <ClassName.method_name>\n"
             "/audit_history [limit]\n"
             "/audit_stats\n"
-    )
+            "/evaluation_stats\n"
+            "/rate_audit <id> <label> [outcome] [| note]\n"
+        )
 
 
     if text == "/project":
@@ -436,6 +442,76 @@ def handle_memory_command(user_input: str):
             lines.append(f"{index}. {relative_path}")
 
         return "\n".join(lines)
+
+
+    if text.startswith("/rate_audit"):
+        raw_arguments = text.removeprefix("/rate_audit").strip()
+
+        if not raw_arguments:
+            return (
+                "Usage: /rate_audit <id> <label> "
+                "[outcome] [| note]"
+            )
+
+        command_part, separator, note_part = raw_arguments.partition("|")
+        arguments = command_part.strip().split()
+
+        if len(arguments) < 2 or len(arguments) > 3:
+            return (
+                "Usage: /rate_audit <id> <label> "
+                "[outcome] [| note]"
+            )
+
+        audit_id_text = arguments[0]
+        human_label = arguments[1].upper()
+        human_outcome = None
+        human_note = note_part.strip() if separator else None
+
+        if not audit_id_text.isdigit():
+            return "Audit ID must be a number."
+
+        audit_id = int(audit_id_text)
+
+        if human_label not in VALID_HUMAN_LABELS:
+            return (
+                f"Invalid label: {human_label}\n"
+                "Allowed labels: "
+                + ", ".join(sorted(VALID_HUMAN_LABELS))
+            )
+
+        if len(arguments) == 3:
+            human_outcome = arguments[2].upper()
+
+            if human_outcome not in VALID_HUMAN_OUTCOMES:
+                return (
+                    f"Invalid outcome: {human_outcome}\n"
+                    "Allowed outcomes: "
+                    + ", ".join(sorted(VALID_HUMAN_OUTCOMES))
+                )
+
+        updated = rate_audit(
+            audit_id,
+            human_label,
+            human_outcome,
+            human_note,
+        )
+
+        if not updated:
+            return f"Unknown audit ID: {audit_id}"
+
+        lines = [
+            f"Audit #{audit_id} rated:",
+            f"Label: {human_label}",
+        ]
+
+        if human_outcome:
+            lines.append(f"Outcome: {human_outcome}")
+
+        if human_note:
+            lines.append(f"Note: {human_note}")
+
+        return "\n".join(lines)
+
 
     if text.startswith("/audit_history"):
         arguments = text.removeprefix("/audit_history").strip().split()
@@ -457,15 +533,34 @@ def handle_memory_command(user_input: str):
             return "No audit results found."
 
         lines = ["Latest audit results:"]
-
         for row in rows:
             retry_used = "true" if row["retry_used"] else "false"
 
+            human_parts = []
+
+            if row["human_label"] != "NOT_REVIEWED":
+                human_parts.append(
+                    f"human: {row['human_label']}"
+                )
+
+            if row["human_outcome"]:
+                human_parts.append(
+                    f"outcome: {row['human_outcome']}"
+                )
+
+            human_text = ""
+
+            if human_parts:
+                human_text = " | " + " | ".join(human_parts)
+
             if row["status"] == "rejected":
                 lines.append(
-                    f"#{row['id']} | REJECTED | "
-                    f"{row['file_path']}:{row['start_line']}-{row['end_line']} | "
-                    f"retry: {retry_used} | attempts: {row['attempt_count']} | "
+                    f"#{row['id']} | REJECTED"
+                    f"{human_text} | "
+                    f"{row['file_path']}:"
+                    f"{row['start_line']}-{row['end_line']} | "
+                    f"retry: {retry_used} | "
+                    f"attempts: {row['attempt_count']} | "
                     f"{row['created_at']}"
                 )
 
@@ -476,9 +571,12 @@ def handle_memory_command(user_input: str):
             else:
                 lines.append(
                     f"#{row['id']} | {row['verdict']} | "
-                    f"confidence: {row['confidence']} | "
-                    f"{row['file_path']}:{row['start_line']}-{row['end_line']} | "
-                    f"retry: {retry_used} | attempts: {row['attempt_count']} | "
+                    f"confidence: {row['confidence']}"
+                    f"{human_text} | "
+                    f"{row['file_path']}:"
+                    f"{row['start_line']}-{row['end_line']} | "
+                    f"retry: {retry_used} | "
+                    f"attempts: {row['attempt_count']} | "
                     f"{row['created_at']}"
                 )
 
@@ -509,6 +607,62 @@ def handle_memory_command(user_input: str):
             lines.append(f"Most audited file: {most_audited_file}")
 
         return "\n".join(lines)
+
+
+    if text == "/evaluation_stats":
+        stats = get_human_evaluation_stats()
+
+        if stats["total"] == 0:
+            return "No audit results found."
+
+        lines = [
+            "Human evaluation stats:",
+            "",
+            f"Total audits: {stats['total']}",
+            f"Reviewed: {stats['reviewed']}",
+            f"Not reviewed: {stats['not_reviewed']}",
+        ]
+
+        if stats["reviewed"] == 0:
+            lines.append("")
+            lines.append("No audits have been reviewed yet.")
+            return "\n".join(lines)
+
+        lines.append("")
+        lines.append("Labels:")
+
+        label_order = [
+            "USEFUL",
+            "PARTIALLY_USEFUL",
+            "LOW_VALUE",
+            "FALSE_POSITIVE",
+            "NEEDS_MORE_CONTEXT",
+        ]
+
+        for label in label_order:
+            count = stats["label_counts"].get(label, 0)
+            percentage = count / stats["reviewed"] * 100
+
+            lines.append(
+                f"{label}: {count} ({percentage:.1f}%)"
+            )
+
+        lines.append("")
+        lines.append("Outcomes:")
+
+        outcome_order = [
+            "TEST_ADDED",
+            "CODE_CHANGED",
+            "INVESTIGATED_NO_CHANGE",
+            "NO_ACTION",
+        ]
+
+        for outcome in outcome_order:
+            count = stats["outcome_counts"].get(outcome, 0)
+            lines.append(f"{outcome}: {count}")
+
+        return "\n".join(lines)
+
 
     if text == "/context":
         files = scan_project_files(PROJECT_ROOT)
@@ -794,7 +948,9 @@ Return only:
             "/audit_function <path> <function_name>\n"
             "/audit_method <path> <ClassName.method_name>\n"
             "/audit_history [limit]\n"
-            "/audit_stats"
+            "/audit_stats\n"
+            "/evaluation_stats\n"
+            "/rate_audit <id> <label> [outcome] [| note]\n"
       )
 
     return None

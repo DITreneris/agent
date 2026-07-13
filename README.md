@@ -56,6 +56,8 @@ The agent can:
 /audit_method <path> <ClassName.method_name>
 /audit_history [limit]
 /audit_stats
+/evaluation_stats
+/rate_audit <id> <label> [outcome] [| note]
 ```
 
 Additional project/context commands:
@@ -120,6 +122,10 @@ View audit statistics:
 
 ```bash
 /audit_stats
+/evaluation_stats
+/rate_audit 41 USEFUL TEST_ADDED | Added regression coverage
+/rate_audit 42 FALSE_POSITIVE NO_ACTION | Caller already handles the exception
+/rate_audit 43 NEEDS_MORE_CONTEXT | Caller context is required
 ```
 
 ---
@@ -169,6 +175,32 @@ Latest verified result:
 * Validated audits are saved to SQLite.
 * `/audit_history [limit]` shows recent saved audits.
 * `/audit_stats` shows total audits, verdict counts, retry count, and most audited file.
+* `/rate_audit <id> <label> [outcome] [| note]` stores a human evaluation for an accepted or rejected audit.
+* `/evaluation_stats` shows reviewed and unreviewed audit counts, human-label percentages, and recorded outcomes.
+* Human evaluation is separate from model validation. A structurally accepted audit can still be marked as low-value, false-positive, or requiring more context.
+
+### Human Audit Evaluation
+
+Supported labels:
+
+* `USEFUL`
+* `PARTIALLY_USEFUL`
+* `LOW_VALUE`
+* `FALSE_POSITIVE`
+* `NEEDS_MORE_CONTEXT`
+
+Supported outcomes:
+
+* `TEST_ADDED`
+* `CODE_CHANGED`
+* `INVESTIGATED_NO_CHANGE`
+* `NO_ACTION`
+
+Use `|` before an optional note:
+
+```text
+/rate_audit 41 PARTIALLY_USEFUL INVESTIGATED_NO_CHANGE | Finding was valid but required no code change
+```
 
 ### Prompt Boundary Hardening
 
