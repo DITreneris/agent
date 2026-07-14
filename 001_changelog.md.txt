@@ -1,5 +1,37 @@
 # Changelog
 
+
+## 2026-07-14 — Real Project Evaluation Pilot
+
+### Tested
+
+- Evaluated Critique Agent against the production `draudimas` repository.
+- Completed 5 focused audits.
+- Reviewed all audits using the v1.11 human evaluation loop.
+
+### Results
+
+- USEFUL: 0
+- PARTIALLY_USEFUL: 0
+- LOW_VALUE: 2
+- FALSE_POSITIVE: 3
+- NO_ACTION: 5
+
+### Findings
+
+- The agent frequently ignored helper implementations available in the same file.
+- It produced speculative exception, retry, and maintainability concerns.
+- It misclassified intentional design decisions as risks.
+- One accepted audit labeled correct logic as `REAL_BUG`, then contradicted itself and recommended no change.
+- Structural validation did not prevent semantically contradictory audits.
+
+### Decision
+
+- Stop further repository auditing.
+- Prioritize context-aware audit quality and semantic contradiction hardening.
+- Re-run the same 5 cases after v1.12 changes.
+
+
 ## 2026-07-13 — v1.11 Human Evaluation Loop
 
 ### Added
