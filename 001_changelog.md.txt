@@ -1,5 +1,40 @@
 # Changelog
 
+## 2026-07-14 — v1.10 Same-File Context and Evidence Hardening
+
+### Added
+
+- Added automatic same-file helper context for selected function, method, and line audits.
+- Added extraction of directly called top-level helper functions using Python AST.
+- Added helper-name propagation from audit preparation through the runner to validation.
+- Added validation that rejects claims that an available helper definition or contract is missing.
+
+### Hardened
+
+- Prevented `EVIDENCE_LOW` findings from recommending code changes.
+- Required audits containing only `EVIDENCE_LOW` findings to use the `GO` verdict.
+- Rejected low-evidence findings that invent caller expectations, product requirements, business rules, or unstated contracts.
+- Strengthened retry instructions for low-evidence calibration and speculative requirements.
+- Relaxed the prompt requirement from exactly three pitfalls to up to three grounded pitfalls.
+
+### Tested
+
+- Added regression coverage for same-file context extraction, prompt construction, retry behavior, command integration, and semantic validation.
+- Increased the full test suite from 73 to 97 passing tests.
+- Completed repeated smoke tests against a controlled helper-function example.
+
+### Findings
+
+- Same-file context is now correctly included in audit prompts.
+- The validator successfully rejects several classes of unsupported findings and contradictory verdicts.
+- The local model still reformulates speculative maintenance risks using new wording, even when the relevant helper implementation and type contract are visible.
+- Additional phrase-based validator rules produce diminishing returns and do not reliably improve reviewer judgment.
+
+### Decision
+
+- Stop extending synonym and phrase-based rejection rules for this failure mode.
+- Keep the current validator protections as guardrails.
+- Treat future improvement as a model or audit-architecture problem rather than another prompt-marker problem.
 
 ## 2026-07-14 — Real Project Evaluation Pilot
 
