@@ -236,3 +236,327 @@ def test_needs_context_cannot_have_high_confidence():
         "NEEDS_CONTEXT findings cannot use High confidence."
         in result.errors
     )
+
+
+def test_real_bug_cannot_recommend_no_change():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: REAL_BUG",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        "Why: The visible execution path raises an exception.",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "REAL_BUG finding cannot recommend NO_CHANGE."
+        in result.errors
+    )
+
+
+def test_real_bug_cannot_end_with_go_and_no_test_needed():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: REAL_BUG",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        "Why: The visible execution path raises an exception.",
+    ).replace(
+        "Recommended action: NO_CHANGE",
+        "Recommended action: FIX_NOW",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "REAL_BUG finding cannot use GO verdict with NO_TEST_NEEDED."
+        in result.errors
+    )
+
+
+def test_medium_evidence_cannot_have_high_confidence():
+    response = VALID_RESPONSE.replace(
+        "Evidence: EVIDENCE_HIGH",
+        "Evidence: EVIDENCE_MEDIUM",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "EVIDENCE_MEDIUM findings cannot use High confidence."
+        in result.errors
+    )
+
+
+def test_maintainability_hardening_cannot_recommend_no_change():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: MAINTAINABILITY_HARDENING",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        "Why: A small change would reduce future fragility.",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "MAINTAINABILITY_HARDENING cannot recommend NO_CHANGE."
+        in result.errors
+    )
+
+
+def test_hypothetical_future_contract_change_is_rejected():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: MAINTAINABILITY_HARDENING",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        "Why: If the helper were to change its return contract, this function could fail.",
+    ).replace(
+        "Recommended action: NO_CHANGE",
+        "Recommended action: HARDEN_SMALL",
+    ).replace(
+        "6. Verdict\nGO",
+        "6. Verdict\nGO_WITH_NOTES",
+    ).replace(
+        "7. Confidence\nHigh.",
+        "7. Confidence\nMedium",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "Audit findings cannot rely on hypothetical future dependency changes."
+        in result.errors
+    )
+
+
+def test_low_evidence_cannot_recommend_code_change():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: PLAUSIBLE_RISK",
+    ).replace(
+        "Evidence: EVIDENCE_HIGH",
+        "Evidence: EVIDENCE_LOW",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        "Why: A theoretical edge case might exist.",
+    ).replace(
+        "Recommended action: NO_CHANGE",
+        "Recommended action: HARDEN_SMALL",
+    ).replace(
+        "Test status: NO_TEST_NEEDED",
+        "Test status: POSSIBLE_TEST_GAP",
+    ).replace(
+        "6. Verdict\nGO",
+        "6. Verdict\nGO_WITH_NOTES",
+    ).replace(
+        "7. Confidence\nHigh.",
+        "7. Confidence\nMedium",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "EVIDENCE_LOW findings cannot recommend code changes."
+        in result.errors
+    )
+
+
+def test_available_helper_signature_cannot_be_reported_as_missing_context():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: PLAUSIBLE_RISK",
+    ).replace(
+        "Evidence: EVIDENCE_HIGH",
+        "Evidence: EVIDENCE_MEDIUM",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        (
+            "Why: If safe_parse's return type changes, "
+            "the target could become fragile."
+        ),
+    ).replace(
+        "Missing context: none",
+        (
+            "Missing context: The explicit type signature "
+            "and return contract for safe_parse."
+        ),
+    ).replace(
+        "Recommended action: NO_CHANGE",
+        "Recommended action: HARDEN_SMALL",
+    ).replace(
+        "Test status: NO_TEST_NEEDED",
+        "Test status: POSSIBLE_TEST_GAP",
+    ).replace(
+        "6. Verdict\nGO",
+        "6. Verdict\nGO_WITH_NOTES",
+    ).replace(
+        "7. Confidence\nHigh.",
+        "7. Confidence\nMedium",
+    )
+
+    result = validate_audit_output(
+        response,
+        available_context_names={"safe_parse"},
+    )
+
+    assert result.valid is False
+    assert (
+        "Available helper context cannot be reported as missing: safe_parse."
+        in result.errors
+    )
+
+
+def test_only_low_evidence_findings_cannot_use_go_with_notes():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: PLAUSIBLE_RISK",
+    ).replace(
+        "Evidence: EVIDENCE_HIGH",
+        "Evidence: EVIDENCE_LOW",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        "Why: An alternative external requirement might exist.",
+    ).replace(
+        "Missing context: none",
+        "Missing context: An unspecified external product requirement.",
+    ).replace(
+        "Recommended action: NO_CHANGE",
+        "Recommended action: INSPECT_CONTEXT",
+    ).replace(
+        "Test status: NO_TEST_NEEDED",
+        "Test status: POSSIBLE_TEST_GAP",
+    ).replace(
+        "6. Verdict\nGO",
+        "6. Verdict\nGO_WITH_NOTES",
+    ).replace(
+        "7. Confidence\nHigh.",
+        "7. Confidence\nMedium",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "Audits with only EVIDENCE_LOW findings must use GO."
+        in result.errors
+    )
+
+
+def test_rejects_claim_that_available_helper_definition_is_not_provided():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: NEEDS_CONTEXT",
+    ).replace(
+        "Evidence: EVIDENCE_HIGH",
+        "Evidence: EVIDENCE_LOW",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        (
+            "Why: No immediate defect is visible, but the reliance on "
+            "safe_parse behavior is unverified."
+        ),
+    ).replace(
+        "Missing context: none",
+        "Missing context: The definition or behavior of safe_parse is not provided.",
+    ).replace(
+        "Recommended action: NO_CHANGE",
+        "Recommended action: INSPECT_CONTEXT",
+    ).replace(
+        "Test status: NO_TEST_NEEDED",
+        "Test status: POSSIBLE_TEST_GAP",
+    ).replace(
+        "7. Confidence\nHigh.",
+        "7. Confidence\nMedium",
+    )
+
+    result = validate_audit_output(
+        response,
+        available_context_names={"safe_parse"},
+    )
+
+    assert result.valid is False
+    assert (
+        "Available helper context cannot be reported as missing: safe_parse."
+        in result.errors
+    )
+
+
+def test_rejects_low_evidence_invented_caller_contract():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: NEEDS_CONTEXT",
+    ).replace(
+        "Evidence: EVIDENCE_HIGH",
+        "Evidence: EVIDENCE_LOW",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        (
+            "Why: The function returns None for empty strings, but the "
+            "caller might expect an empty string instead."
+        ),
+    ).replace(
+        "Missing context: none",
+        "Missing context: Caller's expected return value for an empty input string.",
+    ).replace(
+        "Recommended action: NO_CHANGE",
+        "Recommended action: INSPECT_CONTEXT",
+    ).replace(
+        "Test status: NO_TEST_NEEDED",
+        "Test status: POSSIBLE_TEST_GAP",
+    ).replace(
+        "7. Confidence\nHigh.",
+        "7. Confidence\nMedium",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "EVIDENCE_LOW findings cannot invent caller or product requirements."
+        in result.errors
+    )
+
+
+def test_rejects_low_evidence_unstated_requirement_speculation():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: NEEDS_CONTEXT",
+    ).replace(
+        "Evidence: EVIDENCE_HIGH",
+        "Evidence: EVIDENCE_LOW",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        (
+            "Why: Returning None might conflict with an unstated "
+            "requirement to return an empty string instead."
+        ),
+    ).replace(
+        "Missing context: none",
+        "Missing context: The required return value for empty input.",
+    ).replace(
+        "Recommended action: NO_CHANGE",
+        "Recommended action: INSPECT_CONTEXT",
+    ).replace(
+        "Test status: NO_TEST_NEEDED",
+        "Test status: POSSIBLE_TEST_GAP",
+    ).replace(
+        "7. Confidence\nHigh.",
+        "7. Confidence\nMedium",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "EVIDENCE_LOW findings cannot invent caller or product requirements."
+        in result.errors
+    )

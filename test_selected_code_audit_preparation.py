@@ -28,7 +28,7 @@ def test_prepare_selected_code_audit_valid_range(tmp_path: Path) -> None:
     assert prepared.start_line == 1
     assert prepared.end_line == 2
     assert prepared.selected_content == "1: def one():\n2:     return 1"
-
+    assert prepared.context_content == ""
 
 def test_prepare_selected_code_audit_rejects_invalid_range(tmp_path: Path) -> None:
     file_path = tmp_path / "sample.py"

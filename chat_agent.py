@@ -11,6 +11,12 @@ from project_scanner import scan_project_files, format_file_list, read_project_f
 from project_context import build_project_summary
 from prompt_builder import build_system_prompt, build_file_audit_prompt
 from audit_runner import run_validated_audit
+
+from audit_context import (
+    build_same_file_context,
+    build_same_file_context_names,
+)
+
 from code_chunker import (
     find_python_function_range,
     find_python_method_range,
@@ -194,6 +200,8 @@ class SelectedCodeAuditPreparation:
     file_path: Path
     relative_path: str
     selected_content: str
+    context_content: str
+    context_names: set[str]
     start_line: int
     end_line: int
 
@@ -243,10 +251,24 @@ def prepare_selected_code_audit(
         for line_number in range(start_line, end_line + 1)
     )
 
+    context_content = build_same_file_context(
+        file_path=file_path,
+        target_start_line=start_line,
+        target_end_line=end_line,
+    )
+
+    context_names = build_same_file_context_names(
+        file_path=file_path,
+        target_start_line=start_line,
+        target_end_line=end_line,
+    )
+
     return SelectedCodeAuditPreparation(
         file_path=file_path,
         relative_path=file_name,
         selected_content=selected_content,
+        context_content=context_content,
+        context_names=context_names,
         start_line=start_line,
         end_line=end_line,
     )
@@ -257,15 +279,19 @@ def run_selected_code_audit(
     start_line: int,
     end_line: int,
     selected_content: str,
+    context_content: str = "",
+    context_names: set[str] | None = None,
 ) -> str:
     full_prompt = build_file_audit_prompt(
         audit_target,
         selected_content,
+        context_content,
     )
 
     validated_result = run_validated_audit(
         initial_prompt=full_prompt,
         model_call=run_ollama_audit,
+        available_context_names=context_names,
     )
 
     if not validated_result.success:
@@ -759,6 +785,7 @@ def handle_memory_command(user_input: str):
             start_line=prepared.start_line,
             end_line=prepared.end_line,
             selected_content=prepared.selected_content,
+            context_content=prepared.context_content,
         )
 
     if text.startswith("/audit_method"):
@@ -825,6 +852,7 @@ def handle_memory_command(user_input: str):
             start_line=prepared.start_line,
             end_line=prepared.end_line,
             selected_content=prepared.selected_content,
+            context_content=prepared.context_content,
         )
 
     if text.startswith("/audit_lines"):
@@ -861,6 +889,7 @@ def handle_memory_command(user_input: str):
             start_line=prepared.start_line,
             end_line=prepared.end_line,
             selected_content=prepared.selected_content,
+            context_content=prepared.context_content,
         )
 
 

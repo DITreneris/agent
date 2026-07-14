@@ -145,3 +145,67 @@ def test_file_audit_prompt_includes_finding_discipline():
     assert 'Do not use "Action:" or "Test:"' in prompt
     assert "Use High only when the finding is directly provable from visible code" in prompt
     assert "Use Medium or Low when the finding depends on missing imports" in prompt
+
+
+def test_file_audit_prompt_does_not_force_three_invented_pitfalls():
+    prompt = build_file_audit_prompt("example.py", "print('hello')")
+
+    assert "List exactly three practical pitfalls" not in prompt
+    assert "Do not invent pitfalls to fill the section" in prompt
+    assert "If fewer than three grounded pitfalls exist" in prompt
+    assert "state only the grounded pitfalls" in prompt
+
+
+def test_file_audit_prompt_includes_same_file_context_boundaries():
+    prompt = build_file_audit_prompt(
+        file_path="example.py, function target, lines 4-5",
+        file_content="4: def target(value):\n5:     return helper(value)",
+        context_content=(
+            "def helper(value):\n"
+            "    return value.strip()"
+        ),
+    )
+
+    assert "SAME-FILE CONTEXT RULES:" in prompt
+    assert "<<<CONTEXT_START>>>" in prompt
+    assert "<<<CONTEXT_END>>>" in prompt
+    assert "def helper(value):" in prompt
+    assert "Do not audit context helpers as separate targets" in prompt
+    assert "If the context resolves a concern, do not report that concern as a risk" in prompt
+
+
+def test_file_audit_prompt_rejects_speculative_pitfalls():
+    prompt = build_file_audit_prompt(
+        file_path="example.py",
+        file_content="def target(value):\n    return helper(value)",
+        context_content="def helper(value):\n    return value.strip()",
+    )
+
+    assert "Do not list hypothetical future changes as pitfalls" in prompt
+    assert "Do not speculate about unsupported input types" in prompt
+    assert "Do not speculate about unknown caller expectations" in prompt
+    assert "If no actionable risk remains after using context" in prompt
+
+
+def test_file_audit_prompt_does_not_invent_missing_requirements():
+    prompt = build_file_audit_prompt(
+        file_path="example.py",
+        file_content=(
+            "def process(value: str | None) -> str | None:\n"
+            "    cleaned = safe_parse(value)\n"
+            "    if not cleaned:\n"
+            "        return None\n"
+            "    return cleaned.upper()"
+        ),
+        context_content=(
+            "def safe_parse(value: str | None) -> str:\n"
+            "    if value is None:\n"
+            "        return ''\n"
+            "    return value.strip()"
+        ),
+    )
+
+    assert "Do not invent missing product requirements" in prompt
+    assert "When behavior is directly visible from the selected code and context" in prompt
+    assert "do not use NEEDS_CONTEXT" in prompt
+    assert "Do not recommend INSPECT_CONTEXT for behavior already proven" in prompt

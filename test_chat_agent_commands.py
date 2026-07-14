@@ -36,7 +36,7 @@ def test_run_selected_code_audit_saves_rejected_attempt(
     monkeypatch.setattr(
         chat_agent,
         "run_validated_audit",
-        lambda initial_prompt, model_call: ValidatedAuditResult(
+        lambda initial_prompt, model_call, available_context_names=None: ValidatedAuditResult(
             success=False,
             response="Invalid audit response",
             errors=[
