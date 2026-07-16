@@ -416,3 +416,59 @@ def test_evaluation_stats_command_handles_no_reviews(
         "\n"
         "No audits have been reviewed yet."
     )
+
+
+def test_audit_function_passes_context_names_to_runner(
+    tmp_path,
+    monkeypatch,
+):
+    target_file = tmp_path / "example.py"
+    target_file.write_text(
+        "def helper():\n"
+        "    return 1\n\n"
+        "def target():\n"
+        "    return helper()\n",
+        encoding="utf-8",
+    )
+
+    prepared = chat_agent.SelectedCodeAuditPreparation(
+        file_path=target_file,
+        relative_path="example.py",
+        selected_content="def target():\n    return helper()",
+        context_content="def helper():\n    return 1",
+        context_names={"helper"},
+        start_line=4,
+        end_line=5,
+    )
+
+    captured = {}
+
+    monkeypatch.setattr(chat_agent, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        chat_agent,
+        "find_python_function_range",
+        lambda file_path, function_name: (4, 5),
+    )
+    monkeypatch.setattr(
+        chat_agent,
+        "prepare_selected_code_audit",
+        lambda project_root, file_name, start_line, end_line: prepared,
+    )
+
+    def fake_run_selected_code_audit(**kwargs):
+        captured.update(kwargs)
+        return "audit complete"
+
+    monkeypatch.setattr(
+        chat_agent,
+        "run_selected_code_audit",
+        fake_run_selected_code_audit,
+    )
+
+    result = handle_memory_command(
+        "/audit_function example.py target"
+    )
+
+    assert result == "audit complete"
+    assert captured["context_names"] == {"helper"}
+    assert captured["context_content"] == prepared.context_content

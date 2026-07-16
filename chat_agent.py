@@ -786,6 +786,7 @@ def handle_memory_command(user_input: str):
             end_line=prepared.end_line,
             selected_content=prepared.selected_content,
             context_content=prepared.context_content,
+            context_names=prepared.context_names,
         )
 
     if text.startswith("/audit_method"):
@@ -853,6 +854,7 @@ def handle_memory_command(user_input: str):
             end_line=prepared.end_line,
             selected_content=prepared.selected_content,
             context_content=prepared.context_content,
+            context_names=prepared.context_names,
         )
 
     if text.startswith("/audit_lines"):
@@ -890,6 +892,7 @@ def handle_memory_command(user_input: str):
             end_line=prepared.end_line,
             selected_content=prepared.selected_content,
             context_content=prepared.context_content,
+            context_names=prepared.context_names,
         )
 
 
