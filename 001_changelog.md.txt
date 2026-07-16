@@ -1,5 +1,72 @@
 # Changelog
 
+## 2026-07-16 — v1.13 Audit Evaluation Benchmark
+
+### Added
+
+* Added a fixed executable audit evaluation benchmark.
+* Added 3 controlled cases:
+
+  * correct helper contract;
+  * real `None` bug;
+  * intentional `None` contract and false-positive trap.
+* Added benchmark preparation using the same selected-code, same-file context, prompt, model, and validator path as the CLI.
+* Added scoring for:
+
+  * expected verdicts;
+  * required finding labels;
+  * required keyword groups;
+  * forbidden claims;
+  * unexpected findings;
+  * validation success;
+  * retry usage.
+* Added evaluation suite aggregation and pass-rate summaries.
+
+### Fixed
+
+* Fixed `/audit_function`, `/audit_method`, and `/audit_lines` so `prepared.context_names` are passed into semantic validation.
+* Added regression coverage to prevent helper context names from being dropped again.
+
+### Tested
+
+* Increased the full test suite from 97 to 109 passing tests.
+* Ran the benchmark with `gemma4:e4b`.
+* Ran the same benchmark with `qwen3:8b` using the same system prompt and settings.
+
+### Results
+
+`gemma4:e4b`:
+
+* Passed: 1 of 3
+* Pass rate: 33%
+* Correctly identified the explicit `None.strip()` bug.
+* Failed both correct-code and intentional-design cases because it continued generating unsupported concerns.
+
+`qwen3:8b`:
+
+* Passed: 0 of 3
+* Pass rate: 0%
+* Used `GO_WITH_NOTES` for all three cases.
+* Detected the real bug mechanism but misclassified it as maintainability hardening instead of `REAL_BUG`.
+* Produced findings for both correct-code and intentional-design cases.
+
+### Findings
+
+* The benchmark can distinguish structural validity from actual audit usefulness.
+* `gemma4:e4b` remains better than `qwen3:8b` for the current audit task, but neither model is reliable enough for authoritative review.
+* The current models can detect obvious defects, but they are poorly calibrated when code is correct or intentionally designed.
+* Validator guardrails reduce unsafe acceptance but do not repair weak reviewer judgment.
+* Exact phrase matching was insufficient for evaluation and was replaced with keyword groups and required finding labels.
+
+### Decision
+
+* Keep `gemma4:e4b` as the current baseline model.
+* Do not integrate `qwen3:8b`.
+* Stop adding prompt markers or synonym-based validator rules.
+* Use the fixed benchmark for all future model and architecture experiments.
+* Next experiment: test an `Evidence extraction → Judgment` architecture without changing the production CLI.
+
+
 ## 2026-07-14 — v1.12 Same-File Context and Evidence Hardening
 
 ### Added
