@@ -19,5 +19,8 @@
     [
       "attributeerror"
     ]
+  ],
+  "required_finding_labels": [
+    "REAL_BUG"
   ]
 }

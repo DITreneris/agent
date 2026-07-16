@@ -96,6 +96,19 @@ def score_evaluation_result(
     if case.get("expected_no_findings") is True:
         no_findings_pass = not finding_labels_found
 
+    required_finding_labels = case.get(
+        "required_finding_labels",
+        [],
+    )
+    missing_required_finding_labels = [
+        label
+        for label in required_finding_labels
+        if label not in finding_labels_found
+    ]
+    required_finding_labels_pass = (
+        not missing_required_finding_labels
+    )
+
     response_lower = response.lower()
 
     required_claims = case.get("required_claims", [])
@@ -137,6 +150,12 @@ def score_evaluation_result(
         "verdict_pass": verdict_pass,
         "finding_labels_found": finding_labels_found,
         "no_findings_pass": no_findings_pass,
+        "missing_required_finding_labels": (
+            missing_required_finding_labels
+        ),
+        "required_finding_labels_pass": (
+            required_finding_labels_pass
+        ),
         "missing_required_claims": missing_required_claims,
         "required_claims_pass": required_claims_pass,
         "missing_required_keyword_groups": (
@@ -151,6 +170,7 @@ def score_evaluation_result(
             result.success
             and verdict_pass
             and no_findings_pass
+            and required_finding_labels_pass
             and required_claims_pass
             and required_keyword_groups_pass
             and forbidden_claims_pass

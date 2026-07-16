@@ -325,3 +325,42 @@ def test_run_evaluation_suite_aggregates_scores(
         "failed": 0,
         "pass_rate": 1.0,
     }
+
+
+def test_score_requires_expected_finding_label() -> None:
+    case = {
+        "id": "case_real_bug",
+        "expected_verdicts": ["GO_WITH_NOTES", "BLOCK"],
+        "required_finding_labels": ["REAL_BUG"],
+        "required_keyword_groups": [
+            ["none", "strip"],
+            ["attributeerror"],
+        ],
+        "forbidden_claims": [],
+    }
+
+    result = ValidatedAuditResult(
+        success=True,
+        response=(
+            "1. Bottom line\n"
+            "Missing name may cause failure.\n"
+            "2. Direct critique\n"
+            "Classification: MAINTAINABILITY_HARDENING\n"
+            "Evidence: EVIDENCE_HIGH\n"
+            "Calling strip on None raises AttributeError.\n"
+            "6. Verdict\n"
+            "GO_WITH_NOTES\n"
+            "7. Confidence\n"
+            "Medium"
+        ),
+        errors=[],
+        retry_used=False,
+    )
+
+    score = score_evaluation_result(case, result)
+
+    assert score["required_finding_labels_pass"] is False
+    assert score["missing_required_finding_labels"] == [
+        "REAL_BUG"
+    ]
+    assert score["passed"] is False
