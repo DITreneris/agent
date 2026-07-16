@@ -1,0 +1,11 @@
+{
+  "id": "case_001_correct_helper_contract",
+  "command": "audit_function",
+  "symbol": "parse_optional_age",
+  "expected_verdicts": ["GO"],
+  "forbidden_claims": [
+    "helper implementation is missing",
+    "caller expects an empty string",
+    "safe_parse should raise an exception"
+  ]
+}

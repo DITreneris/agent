@@ -1,0 +1,11 @@
+{
+  "id": "case_002_real_none_bug",
+  "command": "audit_function",
+  "symbol": "get_name",
+  "expected_verdicts": ["GO_WITH_NOTES", "BLOCK"],
+  "required_claims": [
+    "name may be missing or None",
+    "strip may fail on None"
+  ],
+  "forbidden_claims": []
+}
