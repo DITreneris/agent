@@ -6,24 +6,16 @@ The project is intentionally small, local, and focused on practical development-
 
 ---
 
-## Stable Baseline
+## Current Version
 
-Current stable baseline:
+Current version:
 
-```text
-v1.8 — Stable Local Audit Tool Baseline
-```
-
-Implementation baseline:
-
-```text
-v1.7 — Strict Selected Range Bounds
-```
+v1.12 — Same-File Context and Evidence Hardening
 
 Latest verified state:
 
 ```text
-44 passed, 1 warning
+97 passed, 1 warning
 ```
 
 The remaining warning comes from the external `pydantic_ai` dependency, not from project code.
@@ -147,7 +139,7 @@ python -m pytest
 Latest verified result:
 
 ```text
-44 passed, 1 warning
+97 passed, 1 warning
 ```
 
 ---
@@ -163,6 +155,20 @@ Latest verified result:
 * Selected audit ranges must be inside file bounds.
 * Out-of-bounds `end_line` values are rejected with a clear error.
 
+### Same-File Context
+
+* Selected function, method, and line audits automatically include directly called top-level helper functions from the same Python file.
+* Helper discovery uses Python AST.
+* Helper names are propagated through audit preparation, prompt construction, execution, and semantic validation.
+* Claims that an included helper definition or contract is missing are rejected.
+
+### Evidence Hardening
+
+* `EVIDENCE_LOW` findings cannot recommend code changes.
+* Audits containing only `EVIDENCE_LOW` findings must use the `GO` verdict.
+* Low-evidence findings cannot invent caller expectations, product requirements, business rules, or unstated contracts.
+* Validator protections remain guardrails rather than a substitute for reliable model judgment.
+
 ### Output Reliability
 
 * Enforces a deterministic 7-section audit output.
@@ -172,9 +178,10 @@ Latest verified result:
 
 ### Persistence
 
-* Validated audits are saved to SQLite.
-* `/audit_history [limit]` shows recent saved audits.
-* `/audit_stats` shows total audits, verdict counts, retry count, and most audited file.
+* Accepted and rejected audit attempts are saved to SQLite.
+* Stored data includes validation errors, retry usage, attempt count, final status, and optional human evaluation.
+* `/audit_history [limit]` shows recent accepted and rejected audit attempts.
+* `/audit_stats` shows total attempts, verdict counts, retries, rejection status, and most audited file.
 * `/rate_audit <id> <label> [outcome] [| note]` stores a human evaluation for an accepted or rejected audit.
 * `/evaluation_stats` shows reviewed and unreviewed audit counts, human-label percentages, and recorded outcomes.
 * Human evaluation is separate from model validation. A structurally accepted audit can still be marked as low-value, false-positive, or requiring more context.
@@ -216,6 +223,22 @@ Use `|` before an optional note:
 
 ---
 
+## Current Quality Evidence
+
+A production-repository evaluation pilot completed five focused audits.
+
+* `USEFUL`: 0
+* `PARTIALLY_USEFUL`: 0
+* `LOW_VALUE`: 2
+* `FALSE_POSITIVE`: 3
+* `NO_ACTION`: 5
+
+The pilot showed that structural validation and prompt compliance do not guarantee useful reviewer judgment.
+
+Critique Agent must not currently be treated as an authoritative code reviewer.
+
+---
+
 ## Known Limitations
 
 * `/audit_file` remains legacy and unreliable for larger files.
@@ -224,7 +247,14 @@ Use `|` before an optional note:
 * Nested classes are not supported.
 * Inherited methods are not resolved.
 * Duplicate names in nested scopes remain out of scope.
+* Only directly called top-level same-file helpers are extracted.
+* Cross-file callers and helper implementations are not automatically resolved.
 * Audit quality still depends on local LLM judgment.
+* Structural validity does not guarantee useful reviewer judgment.
+* The local model may restate speculative findings using wording not covered by validator rules.
+* Phrase-based and synonym-based validation has reached diminishing returns.
+* Current real-project evaluation showed a high false-positive and low-value rate.
+* Future improvement may require a stronger model or different audit architecture.
 * The prompt construction is still mostly string-based.
 * The remaining warning comes from `pydantic_ai`, not project code.
 
@@ -249,26 +279,33 @@ Do not add unless repeated real CLI usage proves the need:
 
 ## Future Work Rule
 
-No new feature work unless it solves repeated friction from real CLI usage.
+No new audit feature work unless it solves a measured failure or repeated real CLI friction.
 
-Future development should be triggered only by observed usage pain, for example:
+The next development step is a fixed evaluation benchmark, not another prompt rule or validator marker.
 
-* `/audit_file` is repeatedly needed and unreliable;
-* nested class methods are repeatedly needed;
-* target discovery becomes a real bottleneck;
-* audit output becomes too generic in repeated real use;
-* SQLite history needs practical filtering after enough real audit data exists.
+The benchmark should measure:
 
-Until then, the project should remain stable, local, CLI-first, and deliberately small.
+* useful audit rate;
+* false-positive rate;
+* unsupported-claim rate;
+* correct verdict rate.
+
+Until audit usefulness is validated, the project should remain local, CLI-first, deliberately small, and experimental.
 
 ---
 
 ## Project Status
 
 ```text
-Status: Stable local audit tool
-Active next feature target: None
-Recommended next action: Use in real development sessions before adding features
+Status: Technically stable experimental audit tool
+
+Current version: v1.12 — Same-File Context and Evidence Hardening
+
+Audit quality status: Not validated for authoritative code review
+
+Current development target: Fixed evaluation benchmark
+
+Recommended next action: Re-run controlled audit cases before adding new audit features
 ```
 
 ---

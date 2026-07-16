@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-07-14 — v1.10 Same-File Context and Evidence Hardening
+## 2026-07-14 — v1.12 Same-File Context and Evidence Hardening
 
 ### Added
 
