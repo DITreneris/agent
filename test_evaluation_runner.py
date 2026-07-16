@@ -1,6 +1,14 @@
 from pathlib import Path
 
-from evaluation_runner import load_evaluation_cases
+from audit_runner import ValidatedAuditResult
+
+from evaluation_runner import (
+    load_evaluation_cases,
+    prepare_evaluation_case,
+    score_evaluation_result,
+    summarize_evaluation_scores,
+    run_evaluation_suite,
+)
 
 
 def test_load_evaluation_cases(tmp_path: Path) -> None:
@@ -44,3 +52,276 @@ def test_load_real_evaluation_cases() -> None:
     assert cases[0]["expected_verdicts"] == ["GO"]
     assert cases[1]["expected_verdicts"] == ["GO_WITH_NOTES", "BLOCK"]
     assert cases[2]["expected_verdicts"] == ["GO"]
+
+
+def test_prepare_evaluation_case_includes_same_file_helper() -> None:
+    cases = load_evaluation_cases(Path("evaluation_cases"))
+    prepared = prepare_evaluation_case(cases[0])
+
+    assert prepared["id"] == "case_001_correct_helper_contract"
+    assert prepared["start_line"] == 7
+    assert prepared["end_line"] == 8
+    assert prepared["context_names"] == ["safe_parse"]
+    assert "def safe_parse" in prepared["context_content"]
+    assert "return safe_parse(raw)" in prepared["selected_content"]
+
+
+def test_score_rejects_findings_when_none_are_expected() -> None:
+    case = {
+        "id": "case_001_correct_helper_contract",
+        "expected_verdicts": ["GO"],
+        "expected_no_findings": True,
+    }
+
+    result = ValidatedAuditResult(
+        success=True,
+        response=(
+            "1. Bottom line\n"
+            "No blocking issue is visible.\n"
+            "2. Direct critique\n"
+            "Classification: NEEDS_CONTEXT\n"
+            "Evidence: EVIDENCE_LOW\n"
+            "6. Verdict\n"
+            "GO\n"
+            "7. Confidence\n"
+            "Medium"
+        ),
+        errors=[],
+        retry_used=True,
+    )
+
+    score = score_evaluation_result(case, result)
+
+    assert score["audit_valid"] is True
+    assert score["verdict"] == "GO"
+    assert score["verdict_pass"] is True
+    assert score["finding_labels_found"] == ["NEEDS_CONTEXT"]
+    assert score["no_findings_pass"] is False
+    assert score["passed"] is False
+
+
+def test_score_fails_when_required_claim_is_missing() -> None:
+    case = {
+        "id": "case_required_claim",
+        "expected_verdicts": ["BLOCK"],
+        "required_claims": ["strip may fail on None"],
+        "forbidden_claims": [],
+    }
+
+    result = ValidatedAuditResult(
+        success=True,
+        response=(
+            "1. Bottom line\n"
+            "A bug exists.\n"
+            "2. Direct critique\n"
+            "Classification: REAL_BUG\n"
+            "Evidence: EVIDENCE_HIGH\n"
+            "6. Verdict\n"
+            "BLOCK\n"
+            "7. Confidence\n"
+            "High"
+        ),
+        errors=[],
+        retry_used=False,
+    )
+
+    score = score_evaluation_result(case, result)
+
+    assert score["required_claims_pass"] is False
+    assert score["missing_required_claims"] == [
+        "strip may fail on None"
+    ]
+    assert score["passed"] is False
+
+
+def test_score_fails_when_forbidden_claim_is_present() -> None:
+    case = {
+        "id": "case_forbidden_claim",
+        "expected_verdicts": ["GO"],
+        "forbidden_claims": [
+            "helper implementation is missing"
+        ],
+    }
+
+    result = ValidatedAuditResult(
+        success=True,
+        response=(
+            "1. Bottom line\n"
+            "No blocking issue is visible.\n"
+            "2. Direct critique\n"
+            "The helper implementation is missing.\n"
+            "6. Verdict\n"
+            "GO\n"
+            "7. Confidence\n"
+            "Low"
+        ),
+        errors=[],
+        retry_used=False,
+    )
+
+    score = score_evaluation_result(case, result)
+
+    assert score["forbidden_claims_pass"] is False
+    assert score["matched_forbidden_claims"] == [
+        "helper implementation is missing"
+    ]
+    assert score["passed"] is False
+
+
+def test_score_passes_required_keyword_groups() -> None:
+    case = {
+        "id": "case_keyword_groups",
+        "expected_verdicts": ["BLOCK"],
+        "required_keyword_groups": [
+            ["name", "missing"],
+            ["none", "strip"],
+            ["attributeerror"],
+        ],
+        "forbidden_claims": [],
+    }
+
+    result = ValidatedAuditResult(
+        success=True,
+        response=(
+            "1. Bottom line\n"
+            "The name key may be missing.\n"
+            "2. Direct critique\n"
+            "Calling strip on None raises AttributeError.\n"
+            "6. Verdict\n"
+            "BLOCK\n"
+            "7. Confidence\n"
+            "High"
+        ),
+        errors=[],
+        retry_used=False,
+    )
+
+    score = score_evaluation_result(case, result)
+
+    assert score["missing_required_keyword_groups"] == []
+    assert score["required_keyword_groups_pass"] is True
+    assert score["passed"] is True
+
+
+def test_score_fails_missing_keyword_group() -> None:
+    case = {
+        "id": "case_keyword_groups",
+        "expected_verdicts": ["BLOCK"],
+        "required_keyword_groups": [
+            ["none", "strip"],
+            ["attributeerror"],
+        ],
+        "forbidden_claims": [],
+    }
+
+    result = ValidatedAuditResult(
+        success=True,
+        response=(
+            "1. Bottom line\n"
+            "The function may fail.\n"
+            "6. Verdict\n"
+            "BLOCK\n"
+            "7. Confidence\n"
+            "High"
+        ),
+        errors=[],
+        retry_used=False,
+    )
+
+    score = score_evaluation_result(case, result)
+
+    assert score["required_keyword_groups_pass"] is False
+    assert score["missing_required_keyword_groups"] == [
+        ["none", "strip"],
+        ["attributeerror"],
+    ]
+    assert score["passed"] is False
+
+
+def test_summarize_evaluation_scores() -> None:
+    scores = [
+        {"passed": False},
+        {"passed": True},
+        {"passed": False},
+    ]
+
+    summary = summarize_evaluation_scores(scores)
+
+    assert summary == {
+        "total": 3,
+        "passed": 1,
+        "failed": 2,
+        "pass_rate": 1 / 3,
+    }
+
+
+def test_run_evaluation_suite_aggregates_scores(
+    monkeypatch,
+) -> None:
+    cases = [
+        {
+            "id": "case_001",
+            "expected_verdicts": ["GO"],
+            "expected_no_findings": True,
+        },
+        {
+            "id": "case_002",
+            "expected_verdicts": ["BLOCK"],
+        },
+    ]
+
+    results = iter(
+        [
+            ValidatedAuditResult(
+                success=True,
+                response=(
+                    "1. Bottom line\n"
+                    "No issue visible.\n"
+                    "2. Direct critique\n"
+                    "No findings.\n"
+                    "6. Verdict\n"
+                    "GO\n"
+                    "7. Confidence\n"
+                    "High"
+                ),
+                errors=[],
+                retry_used=False,
+            ),
+            ValidatedAuditResult(
+                success=True,
+                response=(
+                    "1. Bottom line\n"
+                    "A real bug exists.\n"
+                    "2. Direct critique\n"
+                    "Classification: REAL_BUG\n"
+                    "Evidence: EVIDENCE_HIGH\n"
+                    "6. Verdict\n"
+                    "BLOCK\n"
+                    "7. Confidence\n"
+                    "High"
+                ),
+                errors=[],
+                retry_used=True,
+            ),
+        ]
+    )
+
+    monkeypatch.setattr(
+        "evaluation_runner.run_evaluation_case",
+        lambda case: next(results),
+    )
+
+    scores, summary = run_evaluation_suite(cases)
+
+    assert len(scores) == 2
+    assert scores[0]["passed"] is True
+    assert scores[0]["retry_used"] is False
+    assert scores[1]["passed"] is True
+    assert scores[1]["retry_used"] is True
+
+    assert summary == {
+        "total": 2,
+        "passed": 2,
+        "failed": 0,
+        "pass_rate": 1.0,
+    }
