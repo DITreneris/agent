@@ -16,6 +16,7 @@ Latest verified state:
 
 ```text
 116 passed, 1 warning
+```
 
 The remaining warning comes from the external `pydantic_ai` dependency, not from project code.
 
