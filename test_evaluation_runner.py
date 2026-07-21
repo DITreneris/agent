@@ -100,6 +100,41 @@ def test_score_rejects_findings_when_none_are_expected() -> None:
     assert score["passed"] is False
 
 
+def test_score_accepts_false_positive_as_no_finding() -> None:
+    case = {
+        "id": "case_safe_contract",
+        "expected_verdicts": ["GO"],
+        "expected_no_findings": True,
+    }
+
+    result = ValidatedAuditResult(
+        success=True,
+        response=(
+            "1. Bottom line\n"
+            "The visible code safely handles the concern.\n"
+            "2. Direct critique\n"
+            "Classification: FALSE_POSITIVE_CANDIDATE\n"
+            "Evidence: EVIDENCE_HIGH\n"
+            "Test status: POSSIBLE_TEST_GAP\n"
+            "6. Verdict\n"
+            "GO\n"
+            "7. Confidence\n"
+            "High"
+        ),
+        errors=[],
+        retry_used=False,
+    )
+
+    score = score_evaluation_result(case, result)
+
+    assert score["finding_labels_found"] == [
+        "FALSE_POSITIVE_CANDIDATE"
+    ]
+    assert "TEST_GAP" not in score["finding_labels_found"]
+    assert score["no_findings_pass"] is True
+    assert score["passed"] is True
+
+
 def test_score_fails_when_required_claim_is_missing() -> None:
     case = {
         "id": "case_required_claim",

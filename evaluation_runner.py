@@ -77,6 +77,26 @@ FINDING_LABELS = (
 )
 
 
+def _extract_finding_labels(response: str) -> list[str]:
+    labels: list[str] = []
+
+    for line in response.splitlines():
+        normalized = line.strip()
+
+        if normalized.startswith("- "):
+            normalized = normalized[2:].strip()
+
+        prefix = "Classification:"
+        if not normalized.startswith(prefix):
+            continue
+
+        label = normalized[len(prefix):].strip()
+        if label in FINDING_LABELS and label not in labels:
+            labels.append(label)
+
+    return labels
+
+
 def score_evaluation_result(
     case: dict,
     result: ValidatedAuditResult,
@@ -86,15 +106,14 @@ def score_evaluation_result(
 
     verdict_pass = verdict in case["expected_verdicts"]
 
-    finding_labels_found = [
-        label
-        for label in FINDING_LABELS
-        if label in response
-    ]
+    finding_labels_found = _extract_finding_labels(response)
 
     no_findings_pass = True
     if case.get("expected_no_findings") is True:
-        no_findings_pass = not finding_labels_found
+        no_findings_pass = all(
+            label == "FALSE_POSITIVE_CANDIDATE"
+            for label in finding_labels_found
+        )
 
     required_finding_labels = case.get(
         "required_finding_labels",
