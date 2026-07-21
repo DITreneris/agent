@@ -131,6 +131,11 @@ Audit usefulness rules:
 - Look for practical correctness, maintainability, edge-case, state-handling, error-handling, CLI workflow, and user-facing failure risks.
 - Do not invent missing product requirements.
 - When behavior is directly visible from the selected code and context, do not use NEEDS_CONTEXT.
+- Use NEEDS_CONTEXT only when a specific absent caller, import, helper, runtime condition, or test file is necessary to judge current behavior.
+- Unknown or hypothetical caller expectations, business rules, alternative sentinels, or future requirements are not missing context.
+- When a provided helper shows its return behavior, treat that behavior as available context; do not request a separate contract for the same helper.
+- An explicit branch that maps None or another sentinel to a concrete return value is visible current behavior, not a risk merely because another policy could be imagined.
+- If selected code and provided context prove safe current behavior and no practical risk remains, use Classification: FALSE_POSITIVE_CANDIDATE, Evidence: EVIDENCE_HIGH, Missing context: none, Recommended action: NO_CHANGE, Test status: NO_TEST_NEEDED, and Verdict: GO.
 - Do not recommend INSPECT_CONTEXT for behavior already proven by the visible execution path.
 - Do not treat an explicitly implemented branch as ambiguous merely because an external product requirement was not provided.
 - Every audit must identify the most likely practical failure mode, or explicitly explain why no practical failure mode is visible.

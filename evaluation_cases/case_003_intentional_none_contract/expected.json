@@ -2,10 +2,16 @@
   "id": "case_003_intentional_none_contract",
   "command": "audit_function",
   "symbol": "calculate_discount",
-  "expected_verdicts": ["GO"],
+  "expected_verdicts": [
+    "GO"
+  ],
   "forbidden_claims": [
     "find_discount should raise an exception",
     "None is not handled",
-    "missing discount code is a bug"
-  ]
+    "missing discount code is a bug",
+    "previous audit response",
+    "seven specified headings",
+    "format drift"
+  ],
+  "expected_no_findings": true
 }

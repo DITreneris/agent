@@ -414,6 +414,26 @@ def test_available_helper_signature_cannot_be_reported_as_missing_context():
         in result.errors
     )
 
+def test_available_helper_can_be_discussed_when_missing_context_is_none():
+    response = VALID_RESPONSE.replace(
+        "Why: No blocking defect is visible in the provided code.",
+        (
+            "Why: safe_parse's explicit type signature is visible "
+            "and supports the current implementation."
+        ),
+    )
+
+    result = validate_audit_output(
+        response,
+        available_context_names={"safe_parse"},
+    )
+
+    assert result.valid is True
+    assert (
+        "Available helper context cannot be reported as missing: safe_parse."
+        not in result.errors
+    )
+
 
 def test_only_low_evidence_findings_cannot_use_go_with_notes():
     response = VALID_RESPONSE.replace(
@@ -558,5 +578,80 @@ def test_rejects_low_evidence_unstated_requirement_speculation():
     assert result.valid is False
     assert (
         "EVIDENCE_LOW findings cannot invent caller or product requirements."
+        in result.errors
+    )
+
+
+def test_high_evidence_cannot_rely_on_hypothetical_requirement():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: PLAUSIBLE_RISK",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        (
+            "Why: Returning 0 could hide an invalid discount code "
+            "if 0 is not the desired default."
+        ),
+    ).replace(
+        "Recommended action: NO_CHANGE",
+        "Recommended action: HARDEN_SMALL",
+    ).replace(
+        "Test status: NO_TEST_NEEDED",
+        "Test status: POSSIBLE_TEST_GAP",
+    ).replace(
+        "6. Verdict\nGO",
+        "6. Verdict\nGO_WITH_NOTES",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "EVIDENCE_HIGH findings cannot rely on hypothetical caller "
+        "or product requirements."
+        in result.errors
+    )
+
+
+def test_high_evidence_can_describe_visible_conditional_behavior():
+    response = VALID_RESPONSE.replace(
+        "Why: No blocking defect is visible in the provided code.",
+        (
+            "Why: If the required field is absent, "
+            "the visible code raises ValueError."
+        ),
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is True
+
+def test_high_evidence_hypothetical_requirement_ignores_quotes():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: PLAUSIBLE_RISK",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        (
+            'Why: Returning 0 could hide an invalid discount code '
+            'if "0" is not the desired default.'
+        ),
+    ).replace(
+        "Recommended action: NO_CHANGE",
+        "Recommended action: HARDEN_SMALL",
+    ).replace(
+        "Test status: NO_TEST_NEEDED",
+        "Test status: POSSIBLE_TEST_GAP",
+    ).replace(
+        "6. Verdict\nGO",
+        "6. Verdict\nGO_WITH_NOTES",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "EVIDENCE_HIGH findings cannot rely on hypothetical caller "
+        "or product requirements."
         in result.errors
     )

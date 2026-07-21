@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-07-21 — v1.13.1 Audit Calibration Guardrails
+
+### Changed
+
+- Added semantic validation for contradictory audit classifications and actions.
+- Strengthened visible-contract context supplied to code audits.
+- Reworked retry generation into a standalone audit with explicit calibration rules.
+- Added regression coverage for validator, retry prompt, and prompt construction behavior.
+- Updated the intentional `None` contract evaluation case.
+
+### Verified
+
+- Full suite: 116 passed, 1 external dependency warning.
+- Gemma 4 E4B benchmark: 2 of 3 cases passed.
+- The remaining `case_003` misclassification was rejected by the validator after retry.
+
+### Decision
+
+- Accept the remaining result as a local-model judgment limitation.
+- Stop case-specific prompt tuning and return to real development-session usage.
+
 ## 2026-07-16 — v1.13 Audit Evaluation Benchmark
 
 ### Added

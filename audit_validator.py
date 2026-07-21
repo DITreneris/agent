@@ -65,6 +65,11 @@ LOW_EVIDENCE_INVENTED_REQUIREMENT_ERROR = (
     "EVIDENCE_LOW findings cannot invent caller or product requirements."
 )
 
+HIGH_EVIDENCE_HYPOTHETICAL_REQUIREMENT_ERROR = (
+    "EVIDENCE_HIGH findings cannot rely on hypothetical caller "
+    "or product requirements."
+)
+
 REAL_BUG_NO_CHANGE_ERROR = (
     "REAL_BUG finding cannot recommend NO_CHANGE."
 )
@@ -202,6 +207,31 @@ def _validate_calibration_contract(
         "if the upstream contract expects",
         "unstated requirement",
     )
+
+    high_evidence = "Evidence: EVIDENCE_HIGH" in cleaned
+
+    hypothetical_requirement_markers = (
+        "if the caller expects",
+        "if callers expect",
+        "if the product requires",
+        "if the business rule requires",
+        "if the contract requires",
+        "if this is not the desired",
+        "if that is not the desired",
+        "if 0 is not the desired",
+    )
+
+    normalized_direct_critique = direct_critique.lower().translate(
+        str.maketrans("", "", "\"'`“”‘’")
+    )
+
+    if high_evidence and any(
+        marker in normalized_direct_critique
+        for marker in hypothetical_requirement_markers
+    ):
+        errors.append(
+            HIGH_EVIDENCE_HYPOTHETICAL_REQUIREMENT_ERROR
+        )
 
     if low_evidence and any(
         marker in direct_critique.lower()
@@ -360,13 +390,20 @@ def validate_audit_output(
         )
         direct_critique_lower = direct_critique.lower()
 
+        missing_context_values = [
+            line.partition(":")[2].strip()
+            for line in direct_critique.splitlines()
+            if line.lower().startswith("missing context:")
+        ]
+        missing_context_is_claimed = any(
+            value.lower().rstrip(".") not in {"", "none"}
+            for value in missing_context_values
+        )
+
         for context_name in sorted(available_context_names):
             name_lower = context_name.lower()
 
             helper_is_named = name_lower in direct_critique_lower
-            missing_context_is_claimed = (
-                "missing context:" in direct_critique_lower
-            )
             helper_contract_is_claimed_missing = any(
                 phrase in direct_critique_lower
                 for phrase in (

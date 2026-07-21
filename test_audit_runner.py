@@ -45,8 +45,9 @@ def test_invalid_first_response_is_retried_once():
     assert result.errors == []
     assert result.retry_used is True
     assert len(calls) == 2
-    assert "Previous response:" in calls[1]
-    assert "Invalid response" in calls[1]
+    assert "Previous response:" not in calls[1]
+    assert "Invalid response" not in calls[1]
+    assert "Response must start with '1. Bottom line'." in calls[1]
 
 
 def test_second_invalid_response_is_rejected():
@@ -94,9 +95,13 @@ def test_repair_prompt_includes_semantic_contradiction_rules():
         in REPAIR_PROMPT
     )
     assert (
-        "If no code change is justified, use FALSE_POSITIVE_CANDIDATE or NEEDS_CONTEXT"
+        "If no code change is justified and no specific necessary artifact is absent"
         in REPAIR_PROMPT
     )
+    assert "Unknown or hypothetical caller expectations" in REPAIR_PROMPT
+    assert "If provided helper context shows the helper's behavior" in REPAIR_PROMPT
+    assert "An explicit branch that maps None" in REPAIR_PROMPT
+
     assert (
         "If no grounded practical risk remains, use GO"
         in REPAIR_PROMPT
@@ -220,6 +225,45 @@ def test_repair_prompt_maps_only_low_evidence_error_to_go():
     )
     assert (
         "Do not invent an alternative business rule"
+        in REPAIR_PROMPT
+    )
+
+def test_retry_prompt_includes_original_audit_prompt():
+    responses = iter(
+        [
+            "Invalid response",
+            VALID_RESPONSE,
+        ]
+    )
+    prompts = []
+
+    def model_call(prompt: str) -> str:
+        prompts.append(prompt)
+        return next(responses)
+
+    original_prompt = (
+        "ORIGINAL_AUDIT_CONTEXT: audit calculate_discount "
+        "with the visible find_discount helper."
+    )
+
+    result = run_validated_audit(
+        initial_prompt=original_prompt,
+        model_call=model_call,
+    )
+
+    assert result.success is True
+    assert result.retry_used is True
+    assert len(prompts) == 2
+    assert original_prompt in prompts[1]
+
+
+def test_repair_prompt_requires_standalone_audit():
+    from audit_runner import REPAIR_PROMPT
+
+    assert "The final audit must stand alone." in REPAIR_PROMPT
+    assert (
+        "Do not mention the previous audit, previous response, "
+        "validation errors, retry, repair, or formatting correction"
         in REPAIR_PROMPT
     )
 

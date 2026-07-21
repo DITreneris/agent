@@ -209,3 +209,10 @@ def test_file_audit_prompt_does_not_invent_missing_requirements():
     assert "When behavior is directly visible from the selected code and context" in prompt
     assert "do not use NEEDS_CONTEXT" in prompt
     assert "Do not recommend INSPECT_CONTEXT for behavior already proven" in prompt
+    assert "Use NEEDS_CONTEXT only when a specific absent" in prompt
+    assert "Unknown or hypothetical caller expectations" in prompt
+    assert "treat that behavior as available context" in prompt
+    assert "An explicit branch that maps None" in prompt
+    assert "Classification: FALSE_POSITIVE_CANDIDATE" in prompt
+    assert "Recommended action: NO_CHANGE" in prompt
+    assert "Test status: NO_TEST_NEEDED" in prompt
