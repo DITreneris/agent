@@ -10,13 +10,12 @@ The project is intentionally small, local, and focused on practical development-
 
 Current version:
 
-v1.12 — Same-File Context and Evidence Hardening
+v1.13.1 — Audit Calibration Guardrails
 
 Latest verified state:
 
 ```text
-97 passed, 1 warning
-```
+116 passed, 1 warning
 
 The remaining warning comes from the external `pydantic_ai` dependency, not from project code.
 
@@ -36,6 +35,9 @@ The agent can:
 * show recent audit history;
 * show basic audit statistics;
 * protect selected-code prompts with explicit untrusted input boundaries.
+* validate semantic consistency between classification, evidence, recommended action, test status, and verdict;
+* regenerate one standalone audit if the first response fails validation;
+* reject the audit if the regenerated response remains invalid;
 
 ---
 
@@ -169,6 +171,15 @@ Latest verified result:
 * Low-evidence findings cannot invent caller expectations, product requirements, business rules, or unstated contracts.
 * Validator protections remain guardrails rather than a substitute for reliable model judgment.
 
+### Audit Calibration Guardrails
+
+* Contradictory classification, action, test-status, and verdict combinations are rejected.
+* `MAINTAINABILITY_HARDENING` cannot recommend `NO_CHANGE`.
+* Findings that require no code change must use a compatible classification.
+* Retry generation produces a new standalone audit from the original request and visible code.
+* Retry output must not refer to the previous response, validation errors, retry, repair, or formatting correction.
+* Semantic validation remains a safety boundary; it does not guarantee correct local-model judgment.
+
 ### Output Reliability
 
 * Enforces a deterministic 7-section audit output.
@@ -239,6 +250,18 @@ Critique Agent must not currently be treated as an authoritative code reviewer.
 
 ---
 
+### Latest Calibration Benchmark
+
+The v1.13.1 calibration benchmark used three focused evaluation cases with Gemma 4 E4B.
+
+* Passed: 2 of 3 cases.
+* Failed: `case_003_intentional_none_contract`.
+* The model incorrectly classified an intentional `None` fallback after one retry.
+* The validator rejected the contradictory audit instead of accepting it.
+
+This result is treated as a local-model judgment limitation. Further case-specific prompt tuning was stopped.
+
+
 ## Known Limitations
 
 * `/audit_file` remains legacy and unreliable for larger files.
@@ -257,6 +280,8 @@ Critique Agent must not currently be treated as an authoritative code reviewer.
 * Future improvement may require a stronger model or different audit architecture.
 * The prompt construction is still mostly string-based.
 * The remaining warning comes from `pydantic_ai`, not project code.
+* A structurally correct local-model response may still misclassify intentional or business-defined behavior.
+* The current Gemma 4 E4B calibration benchmark passes 2 of 3 focused cases.
 
 ---
 
