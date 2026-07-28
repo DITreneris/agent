@@ -126,3 +126,27 @@ def test_prepare_selected_code_audit_rejects_end_line_beyond_file_length(
             start_line=1,
             end_line=10,
         )
+
+
+def test_prepare_selected_code_audit_accepts_typescript_range(
+    tmp_path: Path,
+) -> None:
+    file_path = tmp_path / "sample.ts"
+    file_path.write_text(
+        "export function result(challengeTargetYears: number): string {\n"
+        "    return `Challenge cleared: you outlasted your colleague's "
+        "${challengeTargetYears.toFixed(1)}y.`;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    prepared = prepare_selected_code_audit(
+        project_root=tmp_path,
+        file_name="sample.ts",
+        start_line=1,
+        end_line=3,
+    )
+
+    assert "colleague's" in prepared.selected_content
+    assert prepared.context_content == ""
+    assert prepared.context_names == set()

@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-28 — v1.13.2 Non-Python Range Audit Crash Fix
+
+### Fixed
+
+- Prevented `/audit_lines` from parsing non-Python files with Python AST.
+- Non-Python range audits now continue without Python-only same-file context.
+- Invalid Python syntax now degrades gracefully instead of crashing context construction.
+
+### Tested
+
+- Added regression coverage for TypeScript ranges and invalid Python syntax.
+- Full suite: 118 passed, 1 external dependency warning.
+- Completed a real TypeScript smoke audit against the `ladder` repository without crashing.
+
+### Evaluation
+
+- The smoke audit was rated `FALSE_POSITIVE` with outcome `NO_ACTION`.
+- Static TypeScript contracts and existing regression coverage invalidated its findings.
+- No `ladder` product code changes were required.
+
 ## 2026-07-21 — v1.13.1 Audit Calibration Guardrails
 
 ### Changed

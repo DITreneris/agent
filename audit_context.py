@@ -7,8 +7,16 @@ def build_same_file_context(
     target_start_line: int,
     target_end_line: int,
 ) -> str:
+    if file_path.suffix.lower() != ".py":
+        return ""
+
     source = file_path.read_text(encoding="utf-8")
-    tree = ast.parse(source)
+
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return ""
+
     lines = source.splitlines()
 
     target_node = None
@@ -66,8 +74,15 @@ def build_same_file_context_names(
     target_start_line: int,
     target_end_line: int,
 ) -> set[str]:
+    if file_path.suffix.lower() != ".py":
+        return set()
+
     source = file_path.read_text(encoding="utf-8")
-    tree = ast.parse(source)
+
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return set()
 
     target_node = None
 

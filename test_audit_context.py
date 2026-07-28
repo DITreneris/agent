@@ -106,3 +106,28 @@ def test_build_same_file_context_names_returns_called_helpers(
     )
 
     assert names == {"normalize", "validate"}
+
+
+def test_build_same_file_context_handles_invalid_python(
+    tmp_path: Path,
+) -> None:
+    from audit_context import build_same_file_context_names
+
+    file_path = tmp_path / "broken.py"
+    file_path.write_text(
+        "def broken(:\n"
+        "    pass\n",
+        encoding="utf-8",
+    )
+
+    assert build_same_file_context(
+        file_path=file_path,
+        target_start_line=1,
+        target_end_line=2,
+    ) == ""
+
+    assert build_same_file_context_names(
+        file_path=file_path,
+        target_start_line=1,
+        target_end_line=2,
+    ) == set()
