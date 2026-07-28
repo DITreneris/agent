@@ -248,6 +248,14 @@ def run_evaluation_suite(
         score["retry_used"] = result.retry_used
         score["validation_errors"] = result.errors
         score["response"] = result.response or ""
+        score["first_response"] = result.first_response
+        score["first_validation_errors"] = list(
+            result.first_validation_errors
+        )
+        score["retry_response"] = result.retry_response
+        score["retry_validation_errors"] = list(
+            result.retry_validation_errors
+        )
         scores.append(score)
 
     summary = summarize_evaluation_scores(scores)

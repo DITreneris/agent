@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from audit_validator import validate_audit_output
 
@@ -91,6 +91,14 @@ class ValidatedAuditResult:
     response: str | None
     errors: list[str]
     retry_used: bool
+    first_response: str | None = None
+    first_validation_errors: list[str] = field(
+        default_factory=list
+    )
+    retry_response: str | None = None
+    retry_validation_errors: list[str] = field(
+        default_factory=list
+    )
 
 
 def run_validated_audit(
@@ -111,6 +119,10 @@ def run_validated_audit(
             response=first_response.strip(),
             errors=[],
             retry_used=False,
+            first_response=first_response.strip(),
+            first_validation_errors=[],
+            retry_response=None,
+            retry_validation_errors=[],
         )
 
     validation_errors = "\n".join(
@@ -136,11 +148,25 @@ def run_validated_audit(
             response=second_response.strip(),
             errors=[],
             retry_used=True,
+            first_response=first_response.strip(),
+            first_validation_errors=list(
+                first_validation.errors
+            ),
+            retry_response=second_response.strip(),
+            retry_validation_errors=[],
         )
 
     return ValidatedAuditResult(
         success=False,
         response=second_response.strip(),
-        errors=second_validation.errors,
+        errors=list(second_validation.errors),
         retry_used=True,
+        first_response=first_response.strip(),
+        first_validation_errors=list(
+            first_validation.errors
+        ),
+        retry_response=second_response.strip(),
+        retry_validation_errors=list(
+            second_validation.errors
+        ),
     )

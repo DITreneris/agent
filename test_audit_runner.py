@@ -69,6 +69,37 @@ def test_second_invalid_response_is_rejected():
     assert len(calls) == 2
 
 
+
+def test_retry_preserves_both_attempts_and_validation_errors():
+    responses = iter(
+        [
+            "Invalid first response",
+            "Invalid retry response",
+        ]
+    )
+
+    def model_call(prompt: str) -> str:
+        return next(responses)
+
+    result = run_validated_audit(
+        initial_prompt="Audit this code.",
+        model_call=model_call,
+    )
+
+    assert result.success is False
+    assert result.retry_used is True
+
+    assert result.first_response == "Invalid first response"
+    assert result.first_validation_errors
+
+    assert result.retry_response == "Invalid retry response"
+    assert result.retry_validation_errors
+
+    assert result.response == result.retry_response
+    assert result.errors == result.retry_validation_errors
+
+
+
 def test_retry_is_not_run_more_than_once():
     calls = []
 

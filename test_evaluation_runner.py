@@ -363,6 +363,81 @@ def test_run_evaluation_suite_aggregates_scores(
     }
 
 
+
+def test_run_evaluation_suite_preserves_attempt_diagnostics(
+    monkeypatch,
+) -> None:
+    retry_response = """
+1. Bottom line
+No actionable defect is visible.
+
+2. Direct critique
+Classification: FALSE_POSITIVE_CANDIDATE
+Evidence: EVIDENCE_HIGH
+Why: The visible code handles the case.
+Missing context: none
+
+3. Better option
+Keep the code unchanged.
+
+4. Next steps
+Recommended action: NO_CHANGE
+Test status: NO_TEST_NEEDED
+Reason: No defect is visible.
+
+5. Top 3 pitfalls
+No grounded pitfalls are visible.
+
+6. Verdict
+GO
+
+7. Confidence
+High
+""".strip()
+
+    result = ValidatedAuditResult(
+        success=True,
+        response=retry_response,
+        errors=[],
+        retry_used=True,
+        first_response="Invalid first response",
+        first_validation_errors=[
+            "Response must start with '1. Bottom line'.",
+        ],
+        retry_response=retry_response,
+        retry_validation_errors=[],
+    )
+
+    monkeypatch.setattr(
+        "evaluation_runner.run_evaluation_case",
+        lambda case: result,
+    )
+
+    cases = [
+        {
+            "id": "case_diagnostics",
+            "expected_verdicts": ["GO"],
+            "expected_no_findings": True,
+        }
+    ]
+
+    scores, summary = run_evaluation_suite(cases)
+    score = scores[0]
+
+    assert summary["passed"] == 1
+    assert score["first_response"] == result.first_response
+    assert (
+        score["first_validation_errors"]
+        == result.first_validation_errors
+    )
+    assert score["retry_response"] == result.retry_response
+    assert (
+        score["retry_validation_errors"]
+        == result.retry_validation_errors
+    )
+
+
+
 def test_score_requires_expected_finding_label() -> None:
     case = {
         "id": "case_real_bug",
