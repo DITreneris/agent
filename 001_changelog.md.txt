@@ -1,5 +1,30 @@
 # Changelog
 
+
+## 2026-07-28 — v1.13.3 Audit Contract Validation and Retry Diagnostics
+
+### Fixed
+
+- Rejected invalid classification, evidence, action, test-status, verdict, and confidence values.
+- Prevented no-finding benchmark cases from passing without `FALSE_POSITIVE_CANDIDATE`.
+
+### Added
+
+- Preserved the first response, retry response, and validation errors for both attempts.
+- Exposed attempt-level diagnostics in evaluation results.
+
+### Tested
+
+- Full suite: 127 passed, 1 external dependency warning.
+- Baseline prompt passed 2 of 3 benchmark cases.
+- Across four Variant B runs, results varied between 2 of 3 and 3 of 3; every run required retry.
+
+### Decision
+
+- Rejected Variant B because it did not reliably improve the first response and risked overfitting to the fixed benchmark.
+- Kept the original prompt, stricter contract validation, corrected scoring, and retry diagnostics.
+
+
 ## 2026-07-28 — v1.13.2 Non-Python Range Audit Crash Fix
 
 ### Fixed
