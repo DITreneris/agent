@@ -313,7 +313,8 @@ def test_run_evaluation_suite_aggregates_scores(
                     "1. Bottom line\n"
                     "No issue visible.\n"
                     "2. Direct critique\n"
-                    "No findings.\n"
+                    "Classification: FALSE_POSITIVE_CANDIDATE\n"
+                    "No actionable defect.\n"
                     "6. Verdict\n"
                     "GO\n"
                     "7. Confidence\n"
@@ -398,4 +399,34 @@ def test_score_requires_expected_finding_label() -> None:
     assert score["missing_required_finding_labels"] == [
         "REAL_BUG"
     ]
+    assert score["passed"] is False
+
+
+def test_score_rejects_missing_classification_when_none_are_expected():
+    case = {
+        "id": "case_safe_contract",
+        "expected_verdicts": ["GO"],
+        "expected_no_findings": True,
+    }
+
+    result = ValidatedAuditResult(
+        success=True,
+        response=(
+            "1. Bottom line\n"
+            "No issue is visible.\n"
+            "2. Direct critique\n"
+            "No findings.\n"
+            "6. Verdict\n"
+            "GO\n"
+            "7. Confidence\n"
+            "High"
+        ),
+        errors=[],
+        retry_used=False,
+    )
+
+    score = score_evaluation_result(case, result)
+
+    assert score["finding_labels_found"] == []
+    assert score["no_findings_pass"] is False
     assert score["passed"] is False

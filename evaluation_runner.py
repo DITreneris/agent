@@ -110,9 +110,12 @@ def score_evaluation_result(
 
     no_findings_pass = True
     if case.get("expected_no_findings") is True:
-        no_findings_pass = all(
-            label == "FALSE_POSITIVE_CANDIDATE"
-            for label in finding_labels_found
+        no_findings_pass = (
+            bool(finding_labels_found)
+            and all(
+                label == "FALSE_POSITIVE_CANDIDATE"
+                for label in finding_labels_found
+            )
         )
 
     required_finding_labels = case.get(
