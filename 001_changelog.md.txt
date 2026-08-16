@@ -1,7 +1,7 @@
 # Changelog
 
 
-## 2026-08-16 — v1.14 Decision-Grade Multi-Seed Benchmark
+## 2026-08-16 — Multi-Seed Benchmark and Retry Diagnostics
 
 ### Added
 
