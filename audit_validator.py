@@ -348,9 +348,18 @@ def _validate_calibration_contract(
         str.maketrans("", "", "\"'`“”‘’")
     )
 
-    if high_evidence and any(
-        marker in normalized_direct_critique
-        for marker in hypothetical_requirement_markers
+    has_hypothetical_state_distinction = (
+        "if " in normalized_direct_critique
+        and "should be distinguishable"
+        in normalized_direct_critique
+    )
+
+    if high_evidence and (
+        any(
+            marker in normalized_direct_critique
+            for marker in hypothetical_requirement_markers
+        )
+        or has_hypothetical_state_distinction
     ):
         errors.append(
             HIGH_EVIDENCE_HYPOTHETICAL_REQUIREMENT_ERROR

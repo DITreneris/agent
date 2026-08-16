@@ -615,6 +615,65 @@ def test_high_evidence_cannot_rely_on_hypothetical_requirement():
     )
 
 
+
+def test_high_evidence_rejects_normative_state_distinction():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: PLAUSIBLE_RISK",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        (
+            "Why: Returning the fallback value could mask the sentinel "
+            "if the two outcomes should be distinguishable."
+        ),
+    ).replace(
+        "Recommended action: NO_CHANGE",
+        "Recommended action: HARDEN_SMALL",
+    ).replace(
+        "Test status: NO_TEST_NEEDED",
+        "Test status: POSSIBLE_TEST_GAP",
+    ).replace(
+        "6. Verdict\nGO",
+        "6. Verdict\nGO_WITH_NOTES",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "EVIDENCE_HIGH findings cannot rely on hypothetical caller "
+        "or product requirements."
+        in result.errors
+    )
+
+
+
+def test_high_evidence_allows_visible_state_distinction_contract():
+    response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: REAL_BUG",
+    ).replace(
+        "Why: No blocking defect is visible in the provided code.",
+        (
+            "Why: The visible contract requires the two outcomes "
+            "to remain distinguishable, but both paths return 0."
+        ),
+    ).replace(
+        "Recommended action: NO_CHANGE",
+        "Recommended action: FIX_NOW",
+    ).replace(
+        "Test status: NO_TEST_NEEDED",
+        "Test status: ADD_TEST_CONFIRMED",
+    ).replace(
+        "6. Verdict\nGO",
+        "6. Verdict\nBLOCK",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is True
+
+
 def test_high_evidence_can_describe_visible_conditional_behavior():
     response = VALID_RESPONSE.replace(
         "Why: No blocking defect is visible in the provided code.",
