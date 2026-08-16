@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import argparse
+from collections.abc import Callable
+from functools import partial
 import json
 from pathlib import Path
 
+from audit_model_client import OllamaAuditConfig
 from audit_runner import ValidatedAuditResult, run_validated_audit
 from audit_validator import _extract_verdict
 from chat_agent import prepare_selected_code_audit, run_ollama_audit
@@ -213,7 +217,82 @@ def summarize_evaluation_scores(scores: list[dict]) -> dict:
     }
 
 
-def run_evaluation_case(case: dict) -> ValidatedAuditResult:
+def summarize_case_stability(
+    scores: list[dict],
+) -> list[dict]:
+    grouped_scores: dict[str, list[dict]] = {}
+    case_order: list[str] = []
+
+    for score in scores:
+        case_id = score["case_id"]
+
+        if case_id not in grouped_scores:
+            grouped_scores[case_id] = []
+            case_order.append(case_id)
+
+        grouped_scores[case_id].append(score)
+
+    summaries: list[dict] = []
+
+    for case_id in case_order:
+        case_scores = grouped_scores[case_id]
+        total_runs = len(case_scores)
+        passed_runs = sum(
+            1
+            for score in case_scores
+            if score["passed"]
+        )
+        failed_runs = total_runs - passed_runs
+        retry_runs = sum(
+            1
+            for score in case_scores
+            if score.get("retry_used", False)
+        )
+
+        verdict_counts: dict[str, int] = {}
+
+        for score in case_scores:
+            verdict = score.get("verdict") or "UNKNOWN"
+            verdict_counts[verdict] = (
+                verdict_counts.get(verdict, 0) + 1
+            )
+
+        summaries.append(
+            {
+                "case_id": case_id,
+                "total_runs": total_runs,
+                "passed_runs": passed_runs,
+                "failed_runs": failed_runs,
+                "pass_rate": (
+                    passed_runs / total_runs
+                    if total_runs
+                    else 0.0
+                ),
+                "stable_pass_outcome": (
+                    total_runs >= 2
+                    and passed_runs in {0, total_runs}
+                ),
+                "verdict_counts": verdict_counts,
+                "stable_verdict": (
+                    total_runs >= 2
+                    and len(verdict_counts) == 1
+                ),
+                "retry_runs": retry_runs,
+                "retry_rate": (
+                    retry_runs / total_runs
+                    if total_runs
+                    else 0.0
+                ),
+            }
+        )
+
+    return summaries
+
+
+def run_evaluation_case(
+    case: dict,
+    model_call: Callable[[str], str] = run_ollama_audit,
+) -> ValidatedAuditResult:
     prepared = prepare_evaluation_case(case)
 
     audit_target = (
@@ -230,19 +309,27 @@ def run_evaluation_case(case: dict) -> ValidatedAuditResult:
 
     return run_validated_audit(
         initial_prompt=prompt,
-        model_call=run_ollama_audit,
+        model_call=model_call,
         available_context_names=set(prepared["context_names"]),
     )
 
 
 def run_evaluation_suite(
     cases: list[dict] | None = None,
+    model_call: Callable[[str], str] = run_ollama_audit,
 ) -> tuple[list[dict], dict]:
-    selected_cases = cases or load_evaluation_cases()
+    selected_cases = (
+        load_evaluation_cases()
+        if cases is None
+        else cases
+    )
     scores: list[dict] = []
 
     for case in selected_cases:
-        result = run_evaluation_case(case)
+        result = run_evaluation_case(
+            case,
+            model_call=model_call,
+        )
         score = score_evaluation_result(case, result)
 
         score["retry_used"] = result.retry_used
@@ -262,9 +349,144 @@ def run_evaluation_suite(
     return scores, summary
 
 
-if __name__ == "__main__":
-    loaded_cases = load_evaluation_cases()
-    print(f"Loaded evaluation cases: {len(loaded_cases)}")
+def parse_seed_list(value: str) -> list[int]:
+    parts = [
+        part.strip()
+        for part in value.split(",")
+    ]
 
-    for case in loaded_cases:
-        print(f"- {case['id']}: {case['symbol']}")
+    if not parts or any(not part for part in parts):
+        raise argparse.ArgumentTypeError(
+            "Seeds must be comma-separated integers."
+        )
+
+    try:
+        seeds = [int(part) for part in parts]
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "Seeds must be comma-separated integers."
+        ) from exc
+
+    if any(seed < 0 for seed in seeds):
+        raise argparse.ArgumentTypeError(
+            "Seeds must be zero or positive integers."
+        )
+
+    return seeds
+
+
+def parse_cli_args(
+    argv: list[str] | None = None,
+) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run the fixed audit evaluation benchmark.",
+    )
+    parser.add_argument(
+        "--model",
+        default="gemma4:e4b",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.1,
+    )
+    parser.add_argument(
+        "--seeds",
+        type=parse_seed_list,
+        default=None,
+        help="Comma-separated integer seeds.",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+    )
+    return parser.parse_args(argv)
+
+
+def run_cli(argv: list[str] | None = None) -> int:
+    args = parse_cli_args(argv)
+    seeds = (
+        args.seeds
+        if args.seeds is not None
+        else [None]
+    )
+
+    runs: list[dict] = []
+    all_scores: list[dict] = []
+
+    for run_index, seed in enumerate(seeds, start=1):
+        config = OllamaAuditConfig(
+            model=args.model,
+            temperature=args.temperature,
+            seed=seed,
+        )
+        model_call = partial(
+            run_ollama_audit,
+            config=config,
+        )
+
+        scores, run_summary = run_evaluation_suite(
+            model_call=model_call,
+        )
+
+        annotated_scores = [
+            {
+                **score,
+                "run_index": run_index,
+                "seed": seed,
+            }
+            for score in scores
+        ]
+        all_scores.extend(annotated_scores)
+
+        runs.append(
+            {
+                "run_index": run_index,
+                "seed": seed,
+                "summary": run_summary,
+                "case_results": annotated_scores,
+            }
+        )
+
+    summary = summarize_evaluation_scores(all_scores)
+
+    report = {
+        "metadata": {
+            "model": args.model,
+            "temperature": args.temperature,
+            "seeds": seeds,
+            "run_count": len(seeds),
+        },
+        "summary": summary,
+        "case_stability": summarize_case_stability(
+            all_scores
+        ),
+        "runs": runs,
+    }
+
+    args.output.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    args.output.write_text(
+        json.dumps(
+            report,
+            indent=2,
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    print(
+        "Evaluation completed: "
+        f"{summary['passed']}/{summary['total']} passed"
+    )
+    print(f"Results written to: {args.output}")
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(run_cli())

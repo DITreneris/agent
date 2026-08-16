@@ -1,14 +1,143 @@
+import json
 from pathlib import Path
 
 from audit_runner import ValidatedAuditResult
 
 from evaluation_runner import (
     load_evaluation_cases,
+    parse_cli_args,
     prepare_evaluation_case,
+    run_cli,
     score_evaluation_result,
+    summarize_case_stability,
     summarize_evaluation_scores,
     run_evaluation_suite,
 )
+
+
+def test_parse_cli_args_accepts_multi_seed_config(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "result.json"
+
+    args = parse_cli_args(
+        [
+            "--model",
+            "test-model",
+            "--temperature",
+            "0.0",
+            "--seeds",
+            "11,22,33",
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert args.model == "test-model"
+    assert args.temperature == 0.0
+    assert args.seeds == [11, 22, 33]
+    assert args.output == output_path
+
+
+def test_run_cli_writes_multi_seed_json_without_real_model(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    captured = {
+        "configs": [],
+    }
+
+    def fake_run_evaluation_suite(
+        cases=None,
+        model_call=None,
+    ):
+        config = model_call.keywords["config"]
+        captured["configs"].append(config)
+
+        return (
+            [
+                {
+                    "case_id": "case_001",
+                    "passed": True,
+                    "verdict": "GO",
+                    "retry_used": False,
+                }
+            ],
+            {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "pass_rate": 1.0,
+            },
+        )
+
+    monkeypatch.setattr(
+        "evaluation_runner.run_evaluation_suite",
+        fake_run_evaluation_suite,
+    )
+
+    output_path = tmp_path / "nested" / "result.json"
+
+    exit_code = run_cli(
+        [
+            "--model",
+            "test-model",
+            "--temperature",
+            "0.0",
+            "--seeds",
+            "11,22,33",
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    report = json.loads(
+        output_path.read_text(encoding="utf-8")
+    )
+
+    assert exit_code == 0
+    assert [
+        config.seed
+        for config in captured["configs"]
+    ] == [11, 22, 33]
+    assert report["metadata"] == {
+        "model": "test-model",
+        "temperature": 0.0,
+        "seeds": [11, 22, 33],
+        "run_count": 3,
+    }
+    assert report["summary"] == {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "pass_rate": 1.0,
+    }
+    assert [
+        run["seed"]
+        for run in report["runs"]
+    ] == [11, 22, 33]
+    assert report["runs"][0]["case_results"][0] == {
+        "case_id": "case_001",
+        "passed": True,
+        "verdict": "GO",
+        "retry_used": False,
+        "run_index": 1,
+        "seed": 11,
+    }
+    assert report["case_stability"] == [
+        {
+            "case_id": "case_001",
+            "total_runs": 3,
+            "passed_runs": 3,
+            "failed_runs": 0,
+            "pass_rate": 1.0,
+            "stable_pass_outcome": True,
+            "verdict_counts": {"GO": 3},
+            "stable_verdict": True,
+            "retry_runs": 0,
+            "retry_rate": 0.0,
+        }
+    ]
 
 
 def test_load_evaluation_cases(tmp_path: Path) -> None:
@@ -290,6 +419,107 @@ def test_summarize_evaluation_scores() -> None:
     }
 
 
+
+def test_summarize_case_stability_tracks_variation() -> None:
+    scores = [
+        {
+            "case_id": "case_stable",
+            "passed": True,
+            "verdict": "GO",
+            "retry_used": False,
+        },
+        {
+            "case_id": "case_variable",
+            "passed": True,
+            "verdict": "GO_WITH_NOTES",
+            "retry_used": False,
+        },
+        {
+            "case_id": "case_stable",
+            "passed": True,
+            "verdict": "GO",
+            "retry_used": False,
+        },
+        {
+            "case_id": "case_variable",
+            "passed": False,
+            "verdict": "BLOCK",
+            "retry_used": True,
+        },
+    ]
+
+    summaries = summarize_case_stability(scores)
+
+    assert summaries == [
+        {
+            "case_id": "case_stable",
+            "total_runs": 2,
+            "passed_runs": 2,
+            "failed_runs": 0,
+            "pass_rate": 1.0,
+            "stable_pass_outcome": True,
+            "verdict_counts": {"GO": 2},
+            "stable_verdict": True,
+            "retry_runs": 0,
+            "retry_rate": 0.0,
+        },
+        {
+            "case_id": "case_variable",
+            "total_runs": 2,
+            "passed_runs": 1,
+            "failed_runs": 1,
+            "pass_rate": 0.5,
+            "stable_pass_outcome": False,
+            "verdict_counts": {
+                "GO_WITH_NOTES": 1,
+                "BLOCK": 1,
+            },
+            "stable_verdict": False,
+            "retry_runs": 1,
+            "retry_rate": 0.5,
+        },
+    ]
+
+
+
+def test_single_run_does_not_establish_stability() -> None:
+    summaries = summarize_case_stability(
+        [
+            {
+                "case_id": "case_single",
+                "passed": True,
+                "verdict": "GO",
+                "retry_used": False,
+            }
+        ]
+    )
+
+    assert summaries[0]["stable_pass_outcome"] is False
+    assert summaries[0]["stable_verdict"] is False
+
+
+def test_run_evaluation_suite_respects_empty_case_list(
+    monkeypatch,
+) -> None:
+    def fail_if_cases_are_loaded():
+        raise AssertionError("Default cases must not be loaded")
+
+    monkeypatch.setattr(
+        "evaluation_runner.load_evaluation_cases",
+        fail_if_cases_are_loaded,
+    )
+
+    scores, summary = run_evaluation_suite(cases=[])
+
+    assert scores == []
+    assert summary == {
+        "total": 0,
+        "passed": 0,
+        "failed": 0,
+        "pass_rate": 0.0,
+    }
+
+
 def test_run_evaluation_suite_aggregates_scores(
     monkeypatch,
 ) -> None:
@@ -342,18 +572,34 @@ def test_run_evaluation_suite_aggregates_scores(
         ]
     )
 
+    model_calls = []
+
+    def fake_run_evaluation_case(case, model_call):
+        model_calls.append(model_call)
+        return next(results)
+
+    def injected_model_call(prompt):
+        return "unused"
+
     monkeypatch.setattr(
         "evaluation_runner.run_evaluation_case",
-        lambda case: next(results),
+        fake_run_evaluation_case,
     )
 
-    scores, summary = run_evaluation_suite(cases)
+    scores, summary = run_evaluation_suite(
+        cases,
+        model_call=injected_model_call,
+    )
 
     assert len(scores) == 2
     assert scores[0]["passed"] is True
     assert scores[0]["retry_used"] is False
     assert scores[1]["passed"] is True
     assert scores[1]["retry_used"] is True
+    assert model_calls == [
+        injected_model_call,
+        injected_model_call,
+    ]
 
     assert summary == {
         "total": 2,
@@ -410,7 +656,7 @@ High
 
     monkeypatch.setattr(
         "evaluation_runner.run_evaluation_case",
-        lambda case: result,
+        lambda case, model_call: result,
     )
 
     cases = [
