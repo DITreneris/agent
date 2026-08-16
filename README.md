@@ -1,52 +1,84 @@
 # Tomas Critique Agent
 
-Local CLI-first code-audit experiment designed to test whether structured output validation, same-file context, and human evaluation can reduce unsupported findings from a local LLM.
+Local CLI-first experiment for testing whether structured output validation,
+focused code context, controlled retries, and human evaluation can reduce
+unsupported findings from a local LLM.
 
-Built with Python, Pydantic AI, Ollama, and SQLite. The project is intentionally small, local, and focused on practical development-session audits.
+This is an internal development experiment, not a product and not an
+authoritative code-review system.
 
-> **Experimental status:** the implementation passes its verified automated test suite, but audit judgment is not validated for authoritative code review.
+> **Experimental status:** the implementation passes its recorded local test
+> suite, but audit judgment is not yet reliable enough for autonomous or
+> authoritative code review.
 
 ## Current State
 
-| Measure | Verified state |
+| Measure | Current evidence |
 |---|---|
-| Version | `v1.13.1 — Audit Calibration Guardrails` |
-| Automated tests | `116 passed, 1 warning` |
-| Calibration benchmark | `2 of 3 cases passed` |
-| Production-repository pilot | `0 of 5 audits rated useful or partially useful` |
-| Development target | Collect real development-session failures and add only repeated cases to the fixed benchmark |
+| Development state | Unreleased work after `v1.13.3` |
+| Latest recorded local tests | `135 passed, 1 external dependency warning` |
+| Fixed benchmark | 3 cases × 3 configured seeds |
+| Previous repair prompt | `6 of 9` passed; retries succeeded `0 of 2` |
+| Current compact repair prompt | `8 of 9` passed; retries succeeded `2 of 2` |
+| Remaining unstable case | `case_003_intentional_none_contract` passed `2 of 3` |
+| Historical real-repository pilot | `0 of 5` audits rated useful or partially useful |
+| Current development target | Validate the compact-retry version in real development sessions |
 
-The remaining test warning comes from the external `pydantic_ai` dependency, not from project code.
+The latest benchmark improved controlled retry behavior, but it does not prove
+that the agent is useful on real repositories.
 
----
+The historical production-repository pilot has not yet been rerun after the
+latest changes.
 
-## How It Works
+## What We Are Testing
 
-1. Select a manual line range, top-level Python function, or direct class method.
-2. Add directly called top-level helpers from the same file as context.
-3. Ask the local model for a strict seven-section audit.
-4. Validate structure and semantic consistency between classification, evidence, action, test status, verdict, and confidence.
-5. Regenerate one standalone audit if validation fails; reject it if the second response remains invalid.
-6. Save accepted and rejected attempts to SQLite for history, statistics, and human evaluation.
+The project tests whether a small local audit system can:
 
-Audit prompts mark paths and code as untrusted input and instruct the model not to follow embedded instructions, fake headings, or copied verdicts.
+1. inspect a focused code range, function, or direct class method;
+2. include directly called top-level helpers from the same Python file;
+3. request a strict seven-section audit from a local model;
+4. reject structurally invalid or internally contradictory responses;
+5. retry once with a compact standalone repair prompt;
+6. preserve both attempts and validation errors;
+7. compare model output against fixed cases and human review.
 
----
+The core research problem is not output formatting. It is reviewer judgment:
+distinguishing a real defect from correct or intentional code.
 
-## Core Commands
+## Run
+
+Start the main CLI:
+
+```bash
+python chat_agent.py
+```
+
+Run the local test suite:
+
+```bash
+python -m pytest
+```
+
+The default audit model is `gemma4:e4b` through local Ollama.
+
+## Focused Audit Commands
 
 ```text
-/help
 /audit_lines <path> <start> <end>
 /audit_function <path> <function_name>
 /audit_method <path> <ClassName.method_name>
+```
+
+Audit evidence and evaluation:
+
+```text
 /audit_history [limit]
 /audit_stats
 /evaluation_stats
 /rate_audit <id> <label> [outcome] [| note]
 ```
 
-Project and context commands:
+Project inspection:
 
 ```text
 /project
@@ -57,7 +89,7 @@ Project and context commands:
 /inspect <path>
 ```
 
-Memory commands:
+Memory:
 
 ```text
 /memory
@@ -74,170 +106,82 @@ Legacy command:
 /audit_file <path>
 ```
 
-`/audit_file` remains available but is unreliable for larger files.
+`/audit_file` remains available but is unreliable for larger or more complex
+files. Prefer a focused line, function, or method audit.
 
----
+## Fixed Benchmark
 
-## Example Audit Workflow
-
-Audit a top-level function:
-
-```bash
-/audit_function prompt_builder.py build_file_audit_prompt
-```
-
-Every accepted audit follows this contract:
-
-```text
-1. Bottom line
-2. Direct critique
-   Classification: <allowed classification>
-   Evidence: <allowed evidence level>
-   Why: <grounded explanation>
-   Missing context: <specific artifact or none>
-3. Better option
-4. Next steps
-   Recommended action: <allowed action>
-   Test status: <allowed test status>
-   Reason: <smallest justified next step>
-5. Top 3 pitfalls
-6. Verdict
-   GO | GO_WITH_NOTES | BLOCK
-7. Confidence
-   High | Medium | Low
-```
-
-Then record whether the result was useful:
+Run the current three-case benchmark with three configured seeds:
 
 ```bash
-/rate_audit 41 USEFUL TEST_ADDED | Added regression coverage
-/rate_audit 42 FALSE_POSITIVE NO_ACTION | Caller already handles the exception
-/rate_audit 43 NEEDS_MORE_CONTEXT | Caller context is required
+python evaluation_runner.py \
+  --model gemma4:e4b \
+  --temperature 0.1 \
+  --seeds 11,22,33 \
+  --output /tmp/critique-agent-benchmark.json
 ```
 
-View the accumulated evidence:
+### Recorded Results
 
-```bash
-/audit_history 5
-/audit_stats
-/evaluation_stats
-```
+| Experiment | Result | Retry result | Decision |
+|---|---:|---:|---|
+| Original repair prompt | `6/9` | `0/2` | Replaced |
+| Compact repair prompt | `8/9` | `2/2` | Kept |
+| Compact prompt + phrase-based state validator | `6/9` | `0/1` | Reverted |
 
----
+Cases 001 and 002 passed `3/3` in every recorded multi-seed run.
 
-## Capabilities and Boundaries
+Case 003 remains the false-positive trap. The model still invents alternative
+caller or product requirements for an intentional `None` contract.
 
-| Capability | Current boundary |
-|---|---|
-| Manual line-range audits | Maximum 200 lines; ranges must stay inside file bounds |
-| Function audits | Top-level Python functions only |
-| Method audits | Direct class methods only |
-| Same-file context | Directly called top-level helpers discovered through Python AST |
-| Cross-file context | Cross-file callers and helper implementations are not automatically resolved |
-| Output contract | Seven deterministic, non-empty sections in a fixed order |
-| Evidence guardrails | Selected low-evidence patterns are rejected when they recommend code changes or introduce unsupported requirements |
-| Calibration checks | Known contradictory combinations between classification, action, test status, verdict, and confidence are rejected |
-| Regeneration | One standalone retry before rejection |
-| Persistence | Accepted and rejected attempts, validation errors, retries, status, and human evaluation are stored in SQLite |
-| Audit reliability | Experimental; structural validity does not guarantee useful judgment |
+Configured seeds did not produce identical first responses in the mixed
+CPU/GPU Ollama runtime. Seed transmission was verified, but deterministic model
+output was not established.
 
-Additional boundaries:
+## Current Boundaries
 
-- nested and inherited methods are not resolved;
-- duplicate names in nested scopes remain out of scope;
-- only directly called helpers are included, not transitive dependencies;
-- prompt construction is still mostly string-based;
-- the local model can restate speculative findings in language not covered by validator rules;
-- phrase-based and synonym-based validation has reached diminishing returns.
+- Manual line-range audits are limited to 200 lines.
+- Function audits support top-level Python functions.
+- Method audits support direct class methods.
+- Same-file context includes directly called top-level helpers.
+- Transitive dependencies are not included.
+- Cross-file callers and helper implementations are not automatically resolved.
+- Nested and inherited methods are not resolved.
+- Prompt construction remains mostly string-based.
+- The validator catches known structural and calibration contradictions.
+- Structural validity does not guarantee useful engineering judgment.
+- A local model can restate speculative findings in wording not covered by
+  validator rules.
 
----
+## Current Decisions
 
-## Human Evaluation
+Keep:
 
-Supported labels:
+- the multi-seed benchmark CLI;
+- per-case stability summaries;
+- raw response and retry diagnostics;
+- the compact standalone repair prompt;
+- one retry before rejection;
+- human evaluation separate from model validation.
 
-- `USEFUL`
-- `PARTIALLY_USEFUL`
-- `LOW_VALUE`
-- `FALSE_POSITIVE`
-- `NEEDS_MORE_CONTEXT`
+Reject:
 
-Supported outcomes:
+- the phrase-based state-distinction validator;
+- additional synonym markers;
+- case-specific prompt rules;
+- treating `8/9` as proof of real-repository usefulness.
 
-- `TEST_ADDED`
-- `CODE_CHANGED`
-- `INVESTIGATED_NO_CHANGE`
-- `NO_ACTION`
+Next validation gate:
 
-Human evaluation remains separate from model validation. A structurally accepted audit can still be low-value, false-positive, or dependent on missing context.
-
----
-
-## Quality Evidence
-
-### Production-Repository Pilot
-
-Five focused audits were evaluated:
-
-| Human result | Count |
-|---|---:|
-| `USEFUL` | 0 |
-| `PARTIALLY_USEFUL` | 0 |
-| `LOW_VALUE` | 2 |
-| `FALSE_POSITIVE` | 3 |
-| `NO_ACTION` outcome | 5 |
-
-The pilot showed that structural validation and prompt compliance do not guarantee useful reviewer judgment.
-
-**Critique Agent must not currently be treated as an authoritative code reviewer.**
-
-### v1.13.1 Calibration Benchmark
-
-The fixed benchmark used three focused cases with Gemma 4 E4B:
-
-- passed: 2 of 3 cases;
-- failed: `case_003_intentional_none_contract`;
-- the model incorrectly classified an intentional `None` fallback after one regeneration;
-- the validator rejected the contradictory audit instead of accepting it.
-
-The failed case is treated as a local-model judgment limitation. Further case-specific prompt tuning was stopped.
-
----
-
-## Run and Test
-
-```bash
-python chat_agent.py
-python -m pytest
-```
-
-Latest verified test result:
-
-```text
-116 passed, 1 warning
-```
-
----
-
-## Next Validation Step
-
-Do not add new audit features unless they solve a measured failure or repeated real CLI friction.
-
-Use the tool during real development sessions. Convert only repeated, evidence-backed failures into representative benchmark cases, then re-run the fixed benchmark before changing the audit architecture. Measure:
-
-- useful audit rate;
-- false-positive rate;
-- unsupported-claim rate;
-- correct verdict rate;
-- validator rejection rate.
-
-Only failures repeated across benchmark cases or real audits should trigger implementation changes. Until audit usefulness is validated, the project should remain local, CLI-first, deliberately small, and experimental.
-
----
+1. use the current version during real development sessions;
+2. record useful, low-value, false-positive, and missing-context outcomes;
+3. compare the results with the historical `0/5` pilot;
+4. consider an `Evidence extraction → Judgment` architecture only if repeated
+   failures justify it.
 
 ## Explicit Non-Goals
 
-Do not add unless repeated real CLI usage proves the need:
+Do not add unless repeated real usage proves the need:
 
 - web UI;
 - dashboards;
@@ -246,11 +190,17 @@ Do not add unless repeated real CLI usage proves the need:
 - vector databases;
 - multi-agent orchestration;
 - autonomous code patching;
+- full-repository autonomous review;
 - complex audit analytics;
-- prompt template engine;
-- full repository autonomous review.
+- product packaging.
 
----
+## Evidence
+
+- [Changelog](001_changelog.md.txt)
+- [Historical audit quality log](002_audit_quality_log.md)
+- [Original multi-seed benchmark](evaluation_results/gemma4_e4b_t01_seeds_11_22_33.json)
+- [Compact-retry benchmark](evaluation_results/gemma4_e4b_t01_seeds_11_22_33_compact_retry.json)
+- [Reverted validator experiment](evaluation_results/gemma4_e4b_t01_seeds_11_22_33_compact_retry_state_validator.json)
 
 ## License
 
