@@ -1,0 +1,384 @@
+{
+  "metadata": {
+    "model": "gemma4:e4b",
+    "temperature": 0.1,
+    "seeds": [
+      11,
+      22,
+      33
+    ],
+    "run_count": 3
+  },
+  "summary": {
+    "total": 9,
+    "passed": 6,
+    "failed": 3,
+    "pass_rate": 0.6666666666666666
+  },
+  "case_stability": [
+    {
+      "case_id": "case_001_correct_helper_contract",
+      "total_runs": 3,
+      "passed_runs": 3,
+      "failed_runs": 0,
+      "pass_rate": 1.0,
+      "stable_pass_outcome": true,
+      "verdict_counts": {
+        "GO": 3
+      },
+      "stable_verdict": true,
+      "retry_runs": 0,
+      "retry_rate": 0.0
+    },
+    {
+      "case_id": "case_002_real_none_bug",
+      "total_runs": 3,
+      "passed_runs": 3,
+      "failed_runs": 0,
+      "pass_rate": 1.0,
+      "stable_pass_outcome": true,
+      "verdict_counts": {
+        "BLOCK": 3
+      },
+      "stable_verdict": true,
+      "retry_runs": 0,
+      "retry_rate": 0.0
+    },
+    {
+      "case_id": "case_003_intentional_none_contract",
+      "total_runs": 3,
+      "passed_runs": 0,
+      "failed_runs": 3,
+      "pass_rate": 0.0,
+      "stable_pass_outcome": true,
+      "verdict_counts": {
+        "UNKNOWN": 2,
+        "GO_WITH_NOTES": 1
+      },
+      "stable_verdict": false,
+      "retry_runs": 2,
+      "retry_rate": 0.6666666666666666
+    }
+  ],
+  "runs": [
+    {
+      "run_index": 1,
+      "seed": 11,
+      "summary": {
+        "total": 3,
+        "passed": 2,
+        "failed": 1,
+        "pass_rate": 0.6666666666666666
+      },
+      "case_results": [
+        {
+          "case_id": "case_001_correct_helper_contract",
+          "audit_valid": true,
+          "verdict": "GO",
+          "verdict_pass": true,
+          "finding_labels_found": [
+            "FALSE_POSITIVE_CANDIDATE"
+          ],
+          "no_findings_pass": true,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": true,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function correctly delegates the parsing logic to `safe_parse`, which handles empty strings by returning None, matching the expected signature.\n\n2. Direct critique\nClassification: FALSE_POSITIVE_CANDIDATE\nEvidence: EVIDENCE_HIGH\nWhy: The function simply calls `safe_parse(raw)` and returns its result. Given that `safe_parse` is available in the same file context and handles the empty string case, the current implementation is functionally correct for its apparent purpose.\nMissing context: none\n\n3. Better option\nNo code change is needed as the function correctly encapsulates the parsing logic provided by the helper function.\n\n4. Next steps\nRecommended action: NO_CHANGE\nTest status: NO_TEST_NEEDED\nReason: The visible code is a direct, safe delegation of logic to a helper function that handles the primary edge case (empty string).\n\n5. Top 3 pitfalls\nNo grounded pitfalls are visible.\n\n6. Verdict\nGO\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function correctly delegates the parsing logic to `safe_parse`, which handles empty strings by returning None, matching the expected signature.\n\n2. Direct critique\nClassification: FALSE_POSITIVE_CANDIDATE\nEvidence: EVIDENCE_HIGH\nWhy: The function simply calls `safe_parse(raw)` and returns its result. Given that `safe_parse` is available in the same file context and handles the empty string case, the current implementation is functionally correct for its apparent purpose.\nMissing context: none\n\n3. Better option\nNo code change is needed as the function correctly encapsulates the parsing logic provided by the helper function.\n\n4. Next steps\nRecommended action: NO_CHANGE\nTest status: NO_TEST_NEEDED\nReason: The visible code is a direct, safe delegation of logic to a helper function that handles the primary edge case (empty string).\n\n5. Top 3 pitfalls\nNo grounded pitfalls are visible.\n\n6. Verdict\nGO\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 1,
+          "seed": 11
+        },
+        {
+          "case_id": "case_002_real_none_bug",
+          "audit_valid": true,
+          "verdict": "BLOCK",
+          "verdict_pass": true,
+          "finding_labels_found": [
+            "REAL_BUG"
+          ],
+          "no_findings_pass": true,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": true,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function `get_name` will raise an AttributeError if the input dictionary `user` is missing the \"name\" key, because `.get(\"name\")` returns `None`, and calling `.strip()` on `None` fails.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The code calls `.strip()` on the result of `user.get(\"name\")`. If \"name\" is not in `user`, `.get(\"name\")` returns `None`, and `None.strip()` raises an AttributeError.\nMissing context: None\n\n3. Better option\nThe function should check if the result of `user.get(\"name\")` is `None` before attempting to call `.strip()`, or use a default value that is safe for `.strip()` if the key is missing.\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: POSSIBLE_TEST_GAP\nReason: A test case demonstrating the failure when \"name\" is missing from the input dictionary is required.\n\n5. Top 3 pitfalls\nThe primary pitfall is the unhandled `AttributeError` when the \"name\" key is absent from the input dictionary `user`. A secondary pitfall is that if the value associated with \"name\" is `None` (and the key exists), the code will still crash on `.strip()`. A third pitfall is that if the value is an empty string `\"\"`, the code executes correctly but might mask the underlying data quality issue.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function `get_name` will raise an AttributeError if the input dictionary `user` is missing the \"name\" key, because `.get(\"name\")` returns `None`, and calling `.strip()` on `None` fails.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The code calls `.strip()` on the result of `user.get(\"name\")`. If \"name\" is not in `user`, `.get(\"name\")` returns `None`, and `None.strip()` raises an AttributeError.\nMissing context: None\n\n3. Better option\nThe function should check if the result of `user.get(\"name\")` is `None` before attempting to call `.strip()`, or use a default value that is safe for `.strip()` if the key is missing.\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: POSSIBLE_TEST_GAP\nReason: A test case demonstrating the failure when \"name\" is missing from the input dictionary is required.\n\n5. Top 3 pitfalls\nThe primary pitfall is the unhandled `AttributeError` when the \"name\" key is absent from the input dictionary `user`. A secondary pitfall is that if the value associated with \"name\" is `None` (and the key exists), the code will still crash on `.strip()`. A third pitfall is that if the value is an empty string `\"\"`, the code executes correctly but might mask the underlying data quality issue.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 1,
+          "seed": 11
+        },
+        {
+          "case_id": "case_003_intentional_none_contract",
+          "audit_valid": false,
+          "verdict": "",
+          "verdict_pass": false,
+          "finding_labels_found": [
+            "MAINTAINABILITY_HARDENING"
+          ],
+          "no_findings_pass": false,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": false,
+          "retry_used": true,
+          "validation_errors": [
+            "Missing section: '6. Verdict'.",
+            "Missing section: '7. Confidence'.",
+            "Section is empty: '5. Top 3 pitfalls'.",
+            "Invalid Verdict value: ''.",
+            "Invalid Confidence value: ''."
+          ],
+          "response": "1. Bottom line\nThe function `calculate_discount` incorrectly assumes that `find_discount` will always return an integer or `None`, but the type hint for `find_discount` suggests it returns `int | None`, and the current implementation handles `None` by returning `0`, which might mask an intended failure or incorrect default.\n\n2. Direct critique\nClassification: MAINTAINABILITY_HARDENING\nEvidence: EVIDENCE_HIGH\nWhy: The function signature for `calculate_discount` is `-> int`, but if `find_discount` returns `None`, the function returns `0` (an integer), which is fine, but the reliance on `find_discount`'s return type and the explicit `else 0` makes the logic slightly brittle if the contract of `find_discount` changes or if `0` is a valid discount that should be distinguishable from a missing code.\nMissing context: none\n\n3. Better option\nThe function should explicitly handle the case where a discount code is provided but yields no discount, perhaps by raising an exception or returning an `Optional[int]` if `0` is not the desired default for an invalid code. Given the current signature `-> int`, returning `0` is the only way to satisfy it, but the logic can be simplified and made clearer by directly using the result of `find_discount`.\n\n4. Next steps\nRecommended action: HARDEN_SMALL\nTest status: POSSIBLE_TEST_GAP\nReason: A test case should be added to confirm the expected behavior (returning 0) when `find_discount` returns `None`.\n\n5. Top 3 pitfalls\n1. Incorrect Default Value: If a valid discount code exists that results in a discount of 0 (e.g., \"FREE\"), the current logic cannot distinguish this from a code that was not found, as both paths result in returning `0`.\n2. Type Inconsistency: The function signature promises `int`, but the dependency `find_discount` returns `int | None`, requiring the explicit `if/else` check to satisfy the type checker, which is a point of potential failure if the dependency changes.\n3. Over-reliance on `None` handling: The code relies on the implicit assumption that `None` from `find_discount` should be treated as `0`, which is a common source of bugs in Python.\n\n6. Bottom line: The function should ideally return `Optional[int]` or raise an error if no discount is found, rather than silently returning `0`.",
+          "first_response": "1. Bottom line\nThe function `calculate_discount` has an incorrect return type annotation and logic mismatch because it can return `0` (an integer) when `find_discount` returns `None`, but the type hint specifies `int` while the logic implies it should handle `None` or default to `0` explicitly.\n\n2. Direct critique\nClassification: MAINTAINABILITY_HARDENING\nEvidence: EVIDENCE_HIGH\nWhy: The function signature is `def calculate_discount(code: str) -> int:`, but line 8 returns `0` if `discount` is `None`. If `find_discount` returns `None`, the function returns `0`, which is an `int`. However, if the intent was to strictly return an integer, the type hint is correct, but the logic relies on the default value `0` when the helper returns `None`. If the helper were to change its return type, this function would break silently regarding its contract.\nMissing context: None\n\n3. Better option\nThe return type annotation should be updated to reflect that it always returns an integer, which is consistent with the current logic of defaulting to 0. No code change is strictly necessary based on the visible logic, but the type hint should be reviewed against the actual return type if the helper's return type is considered part of the contract. Since the current logic forces an `int` return, the type hint `-> int` is technically correct for the visible code path, but the reliance on `find_discount` returning `None` and then defaulting to `0` is the key pattern to note.\n\n4. Next steps\nRecommended action: NO_CHANGE\nTest status: POSSIBLE_TEST_GAP\nReason: The current logic correctly handles the `None` case by returning `0`, but a test case explicitly verifying the `None` path (i.e., calling with an unknown code) is advisable.\n\n5. Top 3 pitfalls\n1. If `find_discount` were to change its return type to `int | None` but the caller expected `int` (and the default `0` was removed), the function would crash or return an unexpected type.\n2. If the default value `0` on line 8 were to be removed or changed to `None`, the function signature `-> int` would become incorrect, leading to type errors downstream.\n3. The function assumes that if `find_discount` returns `None`, `0` is the desired fallback discount amount, which is a business logic assumption not validated by the code structure alone.\n\n6. Verdict\nGO_WITH_NOTES\n\n7. Confidence\nHigh",
+          "first_validation_errors": [
+            "MAINTAINABILITY_HARDENING cannot recommend NO_CHANGE.",
+            "Audit findings cannot rely on hypothetical future dependency changes."
+          ],
+          "retry_response": "1. Bottom line\nThe function `calculate_discount` incorrectly assumes that `find_discount` will always return an integer or `None`, but the type hint for `find_discount` suggests it returns `int | None`, and the current implementation handles `None` by returning `0`, which might mask an intended failure or incorrect default.\n\n2. Direct critique\nClassification: MAINTAINABILITY_HARDENING\nEvidence: EVIDENCE_HIGH\nWhy: The function signature for `calculate_discount` is `-> int`, but if `find_discount` returns `None`, the function returns `0` (an integer), which is fine, but the reliance on `find_discount`'s return type and the explicit `else 0` makes the logic slightly brittle if the contract of `find_discount` changes or if `0` is a valid discount that should be distinguishable from a missing code.\nMissing context: none\n\n3. Better option\nThe function should explicitly handle the case where a discount code is provided but yields no discount, perhaps by raising an exception or returning an `Optional[int]` if `0` is not the desired default for an invalid code. Given the current signature `-> int`, returning `0` is the only way to satisfy it, but the logic can be simplified and made clearer by directly using the result of `find_discount`.\n\n4. Next steps\nRecommended action: HARDEN_SMALL\nTest status: POSSIBLE_TEST_GAP\nReason: A test case should be added to confirm the expected behavior (returning 0) when `find_discount` returns `None`.\n\n5. Top 3 pitfalls\n1. Incorrect Default Value: If a valid discount code exists that results in a discount of 0 (e.g., \"FREE\"), the current logic cannot distinguish this from a code that was not found, as both paths result in returning `0`.\n2. Type Inconsistency: The function signature promises `int`, but the dependency `find_discount` returns `int | None`, requiring the explicit `if/else` check to satisfy the type checker, which is a point of potential failure if the dependency changes.\n3. Over-reliance on `None` handling: The code relies on the implicit assumption that `None` from `find_discount` should be treated as `0`, which is a common source of bugs in Python.\n\n6. Bottom line: The function should ideally return `Optional[int]` or raise an error if no discount is found, rather than silently returning `0`.",
+          "retry_validation_errors": [
+            "Missing section: '6. Verdict'.",
+            "Missing section: '7. Confidence'.",
+            "Section is empty: '5. Top 3 pitfalls'.",
+            "Invalid Verdict value: ''.",
+            "Invalid Confidence value: ''."
+          ],
+          "run_index": 1,
+          "seed": 11
+        }
+      ]
+    },
+    {
+      "run_index": 2,
+      "seed": 22,
+      "summary": {
+        "total": 3,
+        "passed": 2,
+        "failed": 1,
+        "pass_rate": 0.6666666666666666
+      },
+      "case_results": [
+        {
+          "case_id": "case_001_correct_helper_contract",
+          "audit_valid": true,
+          "verdict": "GO",
+          "verdict_pass": true,
+          "finding_labels_found": [
+            "FALSE_POSITIVE_CANDIDATE"
+          ],
+          "no_findings_pass": true,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": true,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function correctly delegates the parsing logic to `safe_parse`, which handles empty strings by returning `None`.\n\n2. Direct critique\nClassification: FALSE_POSITIVE_CANDIDATE\nEvidence: EVIDENCE_HIGH\nWhy: The function simply calls `safe_parse(raw)` and returns its result. Given that `safe_parse` is visible in the context and handles `None` or empty strings, the current implementation is safe for its apparent purpose.\nMissing context: none\n\n3. Better option\nNo code change is needed as the function correctly encapsulates the parsing logic using the provided helper.\n\n4. Next steps\nRecommended action: NO_CHANGE\nTest status: NO_TEST_NEEDED\nReason: The function's behavior is entirely determined by the visible, safe helper function call.\n\n5. Top 3 pitfalls\nNo grounded pitfalls are visible.\n\n6. Verdict\nGO\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function correctly delegates the parsing logic to `safe_parse`, which handles empty strings by returning `None`.\n\n2. Direct critique\nClassification: FALSE_POSITIVE_CANDIDATE\nEvidence: EVIDENCE_HIGH\nWhy: The function simply calls `safe_parse(raw)` and returns its result. Given that `safe_parse` is visible in the context and handles `None` or empty strings, the current implementation is safe for its apparent purpose.\nMissing context: none\n\n3. Better option\nNo code change is needed as the function correctly encapsulates the parsing logic using the provided helper.\n\n4. Next steps\nRecommended action: NO_CHANGE\nTest status: NO_TEST_NEEDED\nReason: The function's behavior is entirely determined by the visible, safe helper function call.\n\n5. Top 3 pitfalls\nNo grounded pitfalls are visible.\n\n6. Verdict\nGO\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 2,
+          "seed": 22
+        },
+        {
+          "case_id": "case_002_real_none_bug",
+          "audit_valid": true,
+          "verdict": "BLOCK",
+          "verdict_pass": true,
+          "finding_labels_found": [
+            "REAL_BUG"
+          ],
+          "no_findings_pass": true,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": true,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function `get_name` will raise an AttributeError if the input dictionary `user` is missing the \"name\" key, because `.get(\"name\")` returns `None`, and calling `.strip()` on `None` fails.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The code calls `.strip()` on the result of `user.get(\"name\")`. If \"name\" is not in `user`, `.get(\"name\")` returns `None`, and `None.strip()` raises an AttributeError.\nMissing context: None\n\n3. Better option\nThe function should check if the result of `user.get(\"name\")` is `None` before attempting to call `.strip()`, or use a default value that is safe for `.strip()` (like an empty string).\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: POSSIBLE_TEST_GAP\nReason: A test case demonstrating an input dictionary missing the \"name\" key is required to confirm the fix addresses the failure path.\n\n5. Top 3 pitfalls\nThe primary pitfall is the unhandled `AttributeError` when the \"name\" key is absent from the input dictionary `user`. A secondary pitfall is that if the value associated with \"name\" is `None` (and the key exists), the code will still crash on `.strip()`. A third pitfall is that if the value is an empty string, `.strip()` is safe, but the logic fails for `None`.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function `get_name` will raise an AttributeError if the input dictionary `user` is missing the \"name\" key, because `.get(\"name\")` returns `None`, and calling `.strip()` on `None` fails.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The code calls `.strip()` on the result of `user.get(\"name\")`. If \"name\" is not in `user`, `.get(\"name\")` returns `None`, and `None.strip()` raises an AttributeError.\nMissing context: None\n\n3. Better option\nThe function should check if the result of `user.get(\"name\")` is `None` before attempting to call `.strip()`, or use a default value that is safe for `.strip()` (like an empty string).\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: POSSIBLE_TEST_GAP\nReason: A test case demonstrating an input dictionary missing the \"name\" key is required to confirm the fix addresses the failure path.\n\n5. Top 3 pitfalls\nThe primary pitfall is the unhandled `AttributeError` when the \"name\" key is absent from the input dictionary `user`. A secondary pitfall is that if the value associated with \"name\" is `None` (and the key exists), the code will still crash on `.strip()`. A third pitfall is that if the value is an empty string, `.strip()` is safe, but the logic fails for `None`.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 2,
+          "seed": 22
+        },
+        {
+          "case_id": "case_003_intentional_none_contract",
+          "audit_valid": false,
+          "verdict": "",
+          "verdict_pass": false,
+          "finding_labels_found": [
+            "PLAUSIBLE_RISK"
+          ],
+          "no_findings_pass": false,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": false,
+          "retry_used": true,
+          "validation_errors": [
+            "Missing section: '6. Verdict'.",
+            "Missing section: '7. Confidence'.",
+            "Section is empty: '5. Top 3 pitfalls'.",
+            "Invalid Verdict value: ''.",
+            "Invalid Confidence value: ''.",
+            "EVIDENCE_HIGH findings cannot rely on hypothetical caller or product requirements."
+          ],
+          "response": "1. Bottom line\nThe function `calculate_discount` incorrectly assumes that `find_discount` will always return an integer or `None`, but the type hint for `find_discount` suggests it returns `int | None`, and the current implementation handles `None` by returning `0`, which might mask an intended failure or incorrect default behavior if `0` is not the desired fallback.\n\n2. Direct critique\nClassification: PLAUSIBLE_RISK\nEvidence: EVIDENCE_HIGH\nWhy: The function signature for `calculate_discount` specifies a return type of `int`, but if `find_discount(code)` returns `None`, the function returns `0` (an integer). If the caller expects the return type to strictly reflect the possibility of no discount being found (e.g., by returning `None` or raising an error), returning `0` silently masks this state.\nMissing context: None\n\n3. Better option\nChange the return type of `calculate_discount` to `int | None` to accurately reflect that it might return `None` if the fallback logic should be to propagate the absence of a discount, or explicitly document that `0` is the guaranteed fallback for unknown codes. If `0` is the intended fallback, the function signature should be updated to `-> int`. Assuming `0` is the intended fallback for unknown codes, the code is functionally correct but the type hint should be updated to reflect this explicit contract.\n\n4. Next steps\nRecommended action: HARDEN_SMALL\nTest status: POSSIBLE_TEST_GAP\nReason: The explicit handling of `None` to return `0` should be covered by a test case that passes an unknown discount code.\n\n5. Top 3 pitfalls\n1. Incorrect Default Value: If the business logic dictates that an unknown discount code should result in an error or `None` being returned, returning `0` silently masks this failure state.\n2. Type Inconsistency: The function signature `-> int` conflicts with the potential need to signal failure via `None` if the fallback logic changes.\n3. Over-reliance on Context: The current implementation relies on the assumption that `0` is an acceptable \"no discount\" value, which might not hold true if `0` is a valid discount amount for other reasons.\n\n6.\nThe function signature for `find_discount` is missing, but based on the usage, it seems the function should be `find_discount(code: str) -> int | None`. The provided code snippet only shows the usage within `calculate_discount`. Assuming the goal is to calculate the total discount, the function signature for `calculate_discount` should be reviewed for type consistency.",
+          "first_response": "1. Bottom line\nThe function `calculate_discount` incorrectly assumes that `find_discount` will always return an integer or `None`, but the type hint for `find_discount` suggests it returns `int | None`, and the current implementation handles `None` by returning `0`, which might mask an intended failure or incorrect default behavior if `0` is a valid discount.\n\n2. Direct critique\nClassification: PLAUSIBLE_RISK\nEvidence: EVIDENCE_HIGH\nWhy: The function signature for `calculate_discount` is `-> int`, but if `find_discount` returns `None`, the function returns `0`. If `0` is not the desired default for an invalid code, this silently masks the failure.\nMissing context: None\n\n3. Better option\nChange the return type of `calculate_discount` to `int | None` to accurately reflect that it might fail to calculate a discount, or explicitly raise an exception if a discount code is expected to always be valid. If returning `0` is the desired behavior for an unknown code, update the type hint to `-> int`.\n\n4. Next steps\nRecommended action: HARDEN_SMALL\nTest status: POSSIBLE_TEST_GAP\nReason: The function should be tested with an input code that is not in the `find_discount` dictionary to confirm the intended default return value (0).\n\n5. Top 3 pitfalls\nThe primary pitfall is the silent failure: if an invalid discount code is passed, the function returns `0` instead of signaling an error, which could lead to incorrect downstream calculations assuming a valid discount was applied.\nA secondary pitfall is the type mismatch: the function signature promises `int` but the logic path for `None` returns `0`, which is an `int`, but the initial type hint for `find_discount` suggests the return type should be handled more carefully if `0` is not the intended default.\nNo additional grounded pitfalls are visible.\n\n6. Verdict\nGO_WITH_NOTES\n\n7. Confidence\nHigh",
+          "first_validation_errors": [
+            "EVIDENCE_HIGH findings cannot rely on hypothetical caller or product requirements."
+          ],
+          "retry_response": "1. Bottom line\nThe function `calculate_discount` incorrectly assumes that `find_discount` will always return an integer or `None`, but the type hint for `find_discount` suggests it returns `int | None`, and the current implementation handles `None` by returning `0`, which might mask an intended failure or incorrect default behavior if `0` is not the desired fallback.\n\n2. Direct critique\nClassification: PLAUSIBLE_RISK\nEvidence: EVIDENCE_HIGH\nWhy: The function signature for `calculate_discount` specifies a return type of `int`, but if `find_discount(code)` returns `None`, the function returns `0` (an integer). If the caller expects the return type to strictly reflect the possibility of no discount being found (e.g., by returning `None` or raising an error), returning `0` silently masks this state.\nMissing context: None\n\n3. Better option\nChange the return type of `calculate_discount` to `int | None` to accurately reflect that it might return `None` if the fallback logic should be to propagate the absence of a discount, or explicitly document that `0` is the guaranteed fallback for unknown codes. If `0` is the intended fallback, the function signature should be updated to `-> int`. Assuming `0` is the intended fallback for unknown codes, the code is functionally correct but the type hint should be updated to reflect this explicit contract.\n\n4. Next steps\nRecommended action: HARDEN_SMALL\nTest status: POSSIBLE_TEST_GAP\nReason: The explicit handling of `None` to return `0` should be covered by a test case that passes an unknown discount code.\n\n5. Top 3 pitfalls\n1. Incorrect Default Value: If the business logic dictates that an unknown discount code should result in an error or `None` being returned, returning `0` silently masks this failure state.\n2. Type Inconsistency: The function signature `-> int` conflicts with the potential need to signal failure via `None` if the fallback logic changes.\n3. Over-reliance on Context: The current implementation relies on the assumption that `0` is an acceptable \"no discount\" value, which might not hold true if `0` is a valid discount amount for other reasons.\n\n6.\nThe function signature for `find_discount` is missing, but based on the usage, it seems the function should be `find_discount(code: str) -> int | None`. The provided code snippet only shows the usage within `calculate_discount`. Assuming the goal is to calculate the total discount, the function signature for `calculate_discount` should be reviewed for type consistency.",
+          "retry_validation_errors": [
+            "Missing section: '6. Verdict'.",
+            "Missing section: '7. Confidence'.",
+            "Section is empty: '5. Top 3 pitfalls'.",
+            "Invalid Verdict value: ''.",
+            "Invalid Confidence value: ''.",
+            "EVIDENCE_HIGH findings cannot rely on hypothetical caller or product requirements."
+          ],
+          "run_index": 2,
+          "seed": 22
+        }
+      ]
+    },
+    {
+      "run_index": 3,
+      "seed": 33,
+      "summary": {
+        "total": 3,
+        "passed": 2,
+        "failed": 1,
+        "pass_rate": 0.6666666666666666
+      },
+      "case_results": [
+        {
+          "case_id": "case_001_correct_helper_contract",
+          "audit_valid": true,
+          "verdict": "GO",
+          "verdict_pass": true,
+          "finding_labels_found": [
+            "FALSE_POSITIVE_CANDIDATE"
+          ],
+          "no_findings_pass": true,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": true,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function correctly delegates parsing to `safe_parse`, which handles empty strings by returning None, matching the expected signature.\n\n2. Direct critique\nClassification: FALSE_POSITIVE_CANDIDATE\nEvidence: EVIDENCE_HIGH\nWhy: The function simply calls `safe_parse(raw)` and returns its result. Given that `safe_parse` handles the empty string case (returning None) and the type hint suggests `int | None`, the current implementation is safe based on the visible context.\nMissing context: none\n\n3. Better option\nNo code change is necessary as the function correctly encapsulates the parsing logic provided by the helper.\n\n4. Next steps\nRecommended action: NO_CHANGE\nTest status: NO_TEST_NEEDED\nReason: The visible code is a direct, safe delegation of logic to a helper function that appears robust for the given context.\n\n5. Top 3 pitfalls\nNo grounded pitfalls are visible.\n\n6. Verdict\nGO\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function correctly delegates parsing to `safe_parse`, which handles empty strings by returning None, matching the expected signature.\n\n2. Direct critique\nClassification: FALSE_POSITIVE_CANDIDATE\nEvidence: EVIDENCE_HIGH\nWhy: The function simply calls `safe_parse(raw)` and returns its result. Given that `safe_parse` handles the empty string case (returning None) and the type hint suggests `int | None`, the current implementation is safe based on the visible context.\nMissing context: none\n\n3. Better option\nNo code change is necessary as the function correctly encapsulates the parsing logic provided by the helper.\n\n4. Next steps\nRecommended action: NO_CHANGE\nTest status: NO_TEST_NEEDED\nReason: The visible code is a direct, safe delegation of logic to a helper function that appears robust for the given context.\n\n5. Top 3 pitfalls\nNo grounded pitfalls are visible.\n\n6. Verdict\nGO\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 3,
+          "seed": 33
+        },
+        {
+          "case_id": "case_002_real_none_bug",
+          "audit_valid": true,
+          "verdict": "BLOCK",
+          "verdict_pass": true,
+          "finding_labels_found": [
+            "REAL_BUG"
+          ],
+          "no_findings_pass": true,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": true,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function `get_name` will raise an AttributeError if the input dictionary `user` is missing the \"name\" key, because `.get(\"name\")` returns `None`, and calling `.strip()` on `None` fails.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The code calls `.strip()` on the result of `user.get(\"name\")`. If \"name\" is not in `user`, `.get(\"name\")` returns `None`, and `None.strip()` raises an AttributeError.\nMissing context: None\n\n3. Better option\nThe function should check if the result of `user.get(\"name\")` is `None` before attempting to call `.strip()`, or use a default value that is safe for stripping (like an empty string).\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: POSSIBLE_TEST_GAP\nReason: A test case must be added to verify behavior when the \"name\" key is missing from the input dictionary.\n\n5. Top 3 pitfalls\nThe most immediate pitfall is passing a dictionary missing the \"name\" key, which causes an AttributeError because `None.strip()` is called. A secondary pitfall is if the value associated with \"name\" is `None` (e.g., `{\"name\": None}`), which also leads to an AttributeError. A third pitfall is if the value is a non-string type that does not have a `.strip()` method.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function `get_name` will raise an AttributeError if the input dictionary `user` is missing the \"name\" key, because `.get(\"name\")` returns `None`, and calling `.strip()` on `None` fails.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The code calls `.strip()` on the result of `user.get(\"name\")`. If \"name\" is not in `user`, `.get(\"name\")` returns `None`, and `None.strip()` raises an AttributeError.\nMissing context: None\n\n3. Better option\nThe function should check if the result of `user.get(\"name\")` is `None` before attempting to call `.strip()`, or use a default value that is safe for stripping (like an empty string).\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: POSSIBLE_TEST_GAP\nReason: A test case must be added to verify behavior when the \"name\" key is missing from the input dictionary.\n\n5. Top 3 pitfalls\nThe most immediate pitfall is passing a dictionary missing the \"name\" key, which causes an AttributeError because `None.strip()` is called. A secondary pitfall is if the value associated with \"name\" is `None` (e.g., `{\"name\": None}`), which also leads to an AttributeError. A third pitfall is if the value is a non-string type that does not have a `.strip()` method.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 3,
+          "seed": 33
+        },
+        {
+          "case_id": "case_003_intentional_none_contract",
+          "audit_valid": true,
+          "verdict": "GO_WITH_NOTES",
+          "verdict_pass": false,
+          "finding_labels_found": [
+            "PLAUSIBLE_RISK"
+          ],
+          "no_findings_pass": false,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": false,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function `calculate_discount` incorrectly assumes that `find_discount` will always return an integer if the code is valid, but the type hint for `find_discount` suggests it can return `None`, leading to a potential type mismatch or incorrect default handling if the caller expects a non-optional integer.\n\n2. Direct critique\nClassification: PLAUSIBLE_RISK\nEvidence: EVIDENCE_HIGH\nWhy: The function signature for `calculate_discount` is `-> int`, but line 8 returns `0` if `discount` is `None`. If `find_discount` returns `None`, the function returns `0`, which is an integer. However, the type hint for `find_discount` (from context) is `int | None`, and the return type of `calculate_discount` should ideally reflect the possibility of returning 0 when the input code is invalid, which it currently does, but the initial type hint for `calculate_discount` is too restrictive if the intent was to signal failure differently. More critically, the return type of `calculate_discount` should probably be `int` if 0 is the intended fallback, which it is, but the reliance on `find_discount`'s return type needs careful handling. The primary issue is that the function signature `-> int` is correct given the fallback to `0`, but the logic relies on `find_discount` returning `None` for invalid codes, which is handled, but the overall contract could be clearer.\nMissing context: None\n\n3. Better option\nThe function signature for `calculate_discount` should be updated to reflect that it always returns an integer, which it currently does by defaulting to 0. No code change is strictly necessary to prevent a runtime crash based on the visible logic, but explicitly documenting the fallback behavior in the docstring would improve clarity.\n\n4. Next steps\nRecommended action: NO_CHANGE\nTest status: POSSIBLE_TEST_GAP\nReason: Consider adding a test case that explicitly passes an unknown discount code to ensure the fallback to 0 is correctly executed.\n\n5. Top 3 pitfalls\n1. If `find_discount` were to change its contract and start raising an exception for unknown codes instead of returning `None`, line 8 would crash with an unhandled exception.\n2. If the fallback value (0) were to change to a non-integer type (e.g., `None`), the function signature `-> int` would become incorrect, leading to type checker warnings or runtime errors depending on the calling context.\n3. The function assumes that 0 is the correct default discount value for any unknown code; if business logic dictates a different default (e.g., raising an error or returning -1), this hardcoded value is a point of failure.\n\n6. Verdict\nGO_WITH_NOTES\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function `calculate_discount` incorrectly assumes that `find_discount` will always return an integer if the code is valid, but the type hint for `find_discount` suggests it can return `None`, leading to a potential type mismatch or incorrect default handling if the caller expects a non-optional integer.\n\n2. Direct critique\nClassification: PLAUSIBLE_RISK\nEvidence: EVIDENCE_HIGH\nWhy: The function signature for `calculate_discount` is `-> int`, but line 8 returns `0` if `discount` is `None`. If `find_discount` returns `None`, the function returns `0`, which is an integer. However, the type hint for `find_discount` (from context) is `int | None`, and the return type of `calculate_discount` should ideally reflect the possibility of returning 0 when the input code is invalid, which it currently does, but the initial type hint for `calculate_discount` is too restrictive if the intent was to signal failure differently. More critically, the return type of `calculate_discount` should probably be `int` if 0 is the intended fallback, which it is, but the reliance on `find_discount`'s return type needs careful handling. The primary issue is that the function signature `-> int` is correct given the fallback to `0`, but the logic relies on `find_discount` returning `None` for invalid codes, which is handled, but the overall contract could be clearer.\nMissing context: None\n\n3. Better option\nThe function signature for `calculate_discount` should be updated to reflect that it always returns an integer, which it currently does by defaulting to 0. No code change is strictly necessary to prevent a runtime crash based on the visible logic, but explicitly documenting the fallback behavior in the docstring would improve clarity.\n\n4. Next steps\nRecommended action: NO_CHANGE\nTest status: POSSIBLE_TEST_GAP\nReason: Consider adding a test case that explicitly passes an unknown discount code to ensure the fallback to 0 is correctly executed.\n\n5. Top 3 pitfalls\n1. If `find_discount` were to change its contract and start raising an exception for unknown codes instead of returning `None`, line 8 would crash with an unhandled exception.\n2. If the fallback value (0) were to change to a non-integer type (e.g., `None`), the function signature `-> int` would become incorrect, leading to type checker warnings or runtime errors depending on the calling context.\n3. The function assumes that 0 is the correct default discount value for any unknown code; if business logic dictates a different default (e.g., raising an error or returning -1), this hardcoded value is a point of failure.\n\n6. Verdict\nGO_WITH_NOTES\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 3,
+          "seed": 33
+        }
+      ]
+    }
+  ]
+}
