@@ -69,6 +69,37 @@ def test_second_invalid_response_is_rejected():
     assert len(calls) == 2
 
 
+
+def test_retry_preserves_both_attempts_and_validation_errors():
+    responses = iter(
+        [
+            "Invalid first response",
+            "Invalid retry response",
+        ]
+    )
+
+    def model_call(prompt: str) -> str:
+        return next(responses)
+
+    result = run_validated_audit(
+        initial_prompt="Audit this code.",
+        model_call=model_call,
+    )
+
+    assert result.success is False
+    assert result.retry_used is True
+
+    assert result.first_response == "Invalid first response"
+    assert result.first_validation_errors
+
+    assert result.retry_response == "Invalid retry response"
+    assert result.retry_validation_errors
+
+    assert result.response == result.retry_response
+    assert result.errors == result.retry_validation_errors
+
+
+
 def test_retry_is_not_run_more_than_once():
     calls = []
 
@@ -87,27 +118,22 @@ def test_retry_is_not_run_more_than_once():
     assert len(calls) == 2
 
 
-def test_repair_prompt_includes_semantic_contradiction_rules():
+def test_repair_prompt_is_compact_and_keeps_calibration_rules():
     from audit_runner import REPAIR_PROMPT
 
+    assert len(REPAIR_PROMPT) < 1800
     assert (
-        "MAINTAINABILITY_HARDENING cannot be combined with NO_CHANGE"
+        "Do not invent alternative business rules, caller expectations,"
         in REPAIR_PROMPT
     )
     assert (
-        "If no code change is justified and no specific necessary artifact is absent"
+        "Treat an explicit branch that maps None to a concrete value"
         in REPAIR_PROMPT
     )
-    assert "Unknown or hypothetical caller expectations" in REPAIR_PROMPT
-    assert "If provided helper context shows the helper's behavior" in REPAIR_PROMPT
-    assert "An explicit branch that maps None" in REPAIR_PROMPT
-
+    assert "Use provided helper behavior as available context" in REPAIR_PROMPT
+    assert "Classification: FALSE_POSITIVE_CANDIDATE" in REPAIR_PROMPT
     assert (
-        "If no grounded practical risk remains, use GO"
-        in REPAIR_PROMPT
-    )
-    assert (
-        "Do not preserve hypothetical future dependency changes"
+        "Do not combine MAINTAINABILITY_HARDENING or PLAUSIBLE_RISK"
         in REPAIR_PROMPT
     )
 
@@ -208,25 +234,20 @@ Medium
     )
 
 
-def test_repair_prompt_maps_only_low_evidence_error_to_go():
+def test_repair_prompt_maps_only_low_evidence_to_go():
     from audit_runner import REPAIR_PROMPT
 
+    assert "If every finding uses EVIDENCE_LOW" in REPAIR_PROMPT
     assert (
-        "Audits with only EVIDENCE_LOW findings must use GO"
+        "Recommended action: NO_CHANGE or INSPECT_CONTEXT"
         in REPAIR_PROMPT
     )
+    assert "and Verdict: GO" in REPAIR_PROMPT
     assert (
-        "When this validation error is present, change the verdict to GO"
-        in REPAIR_PROMPT
+        "When this validation error is present"
+        not in REPAIR_PROMPT
     )
-    assert (
-        "use Recommended action: NO_CHANGE or INSPECT_CONTEXT"
-        in REPAIR_PROMPT
-    )
-    assert (
-        "Do not invent an alternative business rule"
-        in REPAIR_PROMPT
-    )
+
 
 def test_retry_prompt_includes_original_audit_prompt():
     responses = iter(
@@ -260,23 +281,21 @@ def test_retry_prompt_includes_original_audit_prompt():
 def test_repair_prompt_requires_standalone_audit():
     from audit_runner import REPAIR_PROMPT
 
-    assert "The final audit must stand alone." in REPAIR_PROMPT
+    normalized_prompt = " ".join(REPAIR_PROMPT.split())
+
+    assert "The final audit must stand alone." in normalized_prompt
     assert (
         "Do not mention the previous audit, previous response, "
-        "validation errors, retry, repair, or formatting correction"
-        in REPAIR_PROMPT
+        "validation errors, retry, repair, or formatting correction."
+        in normalized_prompt
     )
 
 
-def test_repair_prompt_ends_with_low_evidence_override():
+def test_repair_prompt_ends_with_complete_section_contract():
     from audit_runner import REPAIR_PROMPT
 
-    expected_ending = """FINAL VALIDATION OVERRIDE:
-If every finding uses EVIDENCE_LOW:
-- Verdict must be GO.
-- Recommended action must be NO_CHANGE or INSPECT_CONTEXT.
-- Use NO_TEST_NEEDED unless a concrete missing test is visible.
-- Do not use GO_WITH_NOTES.
-- Do not invent missing caller, product, type, or error-handling requirements."""
+    expected_ending = """Keep the complete answer concise so all seven sections fit.
+Section 6 value: GO, GO_WITH_NOTES, or BLOCK.
+Section 7 value: High, Medium, or Low."""
 
     assert REPAIR_PROMPT.rstrip().endswith(expected_ending)

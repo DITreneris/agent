@@ -12,6 +12,12 @@ from project_context import build_project_summary
 from prompt_builder import build_system_prompt, build_file_audit_prompt
 from audit_runner import run_validated_audit
 
+from audit_model_client import (
+    DEFAULT_OLLAMA_AUDIT_CONFIG,
+    OllamaAuditConfig,
+    call_ollama_audit,
+)
+
 from audit_context import (
     build_same_file_context,
     build_same_file_context_names,
@@ -24,8 +30,6 @@ from code_chunker import (
     MethodNotFoundError,
 )
 
-import json
-import urllib.request
 
 from memory_store import (
     init_memory_db,
@@ -162,37 +166,15 @@ history = load_recent_messages(MAX_HISTORY)
 
 init_memory_db()
 
-def run_ollama_audit(prompt: str) -> str:
-    payload = {
-        "model": "gemma4:e4b",
-        "messages": [
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT,
-            },
-            {
-                "role": "user",
-                "content": prompt,
-            },
-        ],
-        "stream": False,
-        "think": False,
-        "options": {
-            "temperature": 0.1,
-        },
-    }
-
-    request = urllib.request.Request(
-        "http://localhost:11434/api/chat",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
+def run_ollama_audit(
+    prompt: str,
+    config: OllamaAuditConfig = DEFAULT_OLLAMA_AUDIT_CONFIG,
+) -> str:
+    return call_ollama_audit(
+        prompt=prompt,
+        system_prompt=SYSTEM_PROMPT,
+        config=config,
     )
-
-    with urllib.request.urlopen(request, timeout=300) as response:
-        data = json.loads(response.read().decode("utf-8"))
-
-    return data["message"]["content"]
 
 
 @dataclass(frozen=True)

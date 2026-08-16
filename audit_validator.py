@@ -29,6 +29,52 @@ SECTION_4_REQUIRED_LABELS = [
     "Reason:",
 ]
 
+
+ALLOWED_CLASSIFICATIONS = {
+    "REAL_BUG",
+    "PLAUSIBLE_RISK",
+    "FALSE_POSITIVE_CANDIDATE",
+    "MAINTAINABILITY_HARDENING",
+    "PRODUCT_INSIGHT",
+    "TEST_GAP",
+    "NEEDS_CONTEXT",
+}
+
+ALLOWED_EVIDENCE_LEVELS = {
+    "EVIDENCE_HIGH",
+    "EVIDENCE_MEDIUM",
+    "EVIDENCE_LOW",
+}
+
+ALLOWED_ACTIONS = {
+    "NO_CHANGE",
+    "DO_NOT_FIX",
+    "INSPECT_CONTEXT",
+    "HARDEN_SMALL",
+    "ADD_TEST_CONFIRMED",
+    "FIX_NOW",
+    "REFACTOR_LATER",
+}
+
+ALLOWED_TEST_STATUSES = {
+    "ADD_TEST_CONFIRMED",
+    "POSSIBLE_TEST_GAP",
+    "TEST_ALREADY_EXISTS",
+    "NO_TEST_NEEDED",
+}
+
+ALLOWED_VERDICTS = {
+    "GO",
+    "GO_WITH_NOTES",
+    "BLOCK",
+}
+
+ALLOWED_CONFIDENCE_LEVELS = {
+    "High",
+    "Medium",
+    "Low",
+}
+
 BLOCK_REQUIRES_ERROR = (
     "BLOCK verdict requires at least one REAL_BUG finding with EVIDENCE_HIGH."
 )
@@ -137,6 +183,83 @@ def _extract_confidence(response: str) -> str:
     )
 
     return confidence_content.strip().rstrip(".")
+
+
+def _validate_labeled_values(
+    content: str,
+    label: str,
+    allowed_values: set[str],
+    section: str,
+    errors: list[str],
+) -> None:
+    prefix = f"{label}:"
+
+    values = [
+        line.strip().removeprefix(prefix).strip()
+        for line in content.splitlines()
+        if line.strip().startswith(prefix)
+    ]
+
+    for value in values:
+        if value not in allowed_values:
+            errors.append(
+                f"Invalid {label} value in {section}: '{value}'."
+            )
+
+
+def _validate_contract_values(
+    cleaned: str,
+    errors: list[str],
+) -> None:
+    direct_critique = _extract_section_content(
+        cleaned,
+        "2. Direct critique",
+        "3. Better option",
+    )
+    next_steps = _extract_section_content(
+        cleaned,
+        "4. Next steps",
+        "5. Top 3 pitfalls",
+    )
+
+    _validate_labeled_values(
+        direct_critique,
+        "Classification",
+        ALLOWED_CLASSIFICATIONS,
+        "2. Direct critique",
+        errors,
+    )
+    _validate_labeled_values(
+        direct_critique,
+        "Evidence",
+        ALLOWED_EVIDENCE_LEVELS,
+        "2. Direct critique",
+        errors,
+    )
+    _validate_labeled_values(
+        next_steps,
+        "Recommended action",
+        ALLOWED_ACTIONS,
+        "4. Next steps",
+        errors,
+    )
+    _validate_labeled_values(
+        next_steps,
+        "Test status",
+        ALLOWED_TEST_STATUSES,
+        "4. Next steps",
+        errors,
+    )
+
+    verdict = _extract_verdict(cleaned)
+
+    if verdict not in ALLOWED_VERDICTS:
+        errors.append(f"Invalid Verdict value: '{verdict}'.")
+
+    confidence = _extract_confidence(cleaned)
+
+    if confidence not in ALLOWED_CONFIDENCE_LEVELS:
+        errors.append(f"Invalid Confidence value: '{confidence}'.")
 
 
 def _validate_calibration_contract(
@@ -380,6 +503,7 @@ def validate_audit_output(
             errors,
         )
 
+    _validate_contract_values(cleaned, errors)
     _validate_calibration_contract(cleaned, errors)
 
     if available_context_names:

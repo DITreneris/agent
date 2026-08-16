@@ -1,5 +1,79 @@
 # Changelog
 
+
+## 2026-08-16 — v1.14 Decision-Grade Multi-Seed Benchmark
+
+### Added
+
+- Added a configurable benchmark CLI with model, temperature, seed-list, and JSON output options.
+- Added injectable model calls for deterministic unit testing without Ollama.
+- Added per-run results, aggregate scoring, and per-case stability summaries.
+- Preserved raw responses, retry attempts, and validation errors in benchmark reports.
+- Fixed `cases=[]` so an explicitly empty suite no longer loads default cases.
+
+### Changed
+
+- Reduced the repair prompt from 2,771 to 1,609 characters to lower 4,096-token context pressure.
+- Removed duplicated schema and calibration instructions while preserving the standalone seven-section response contract.
+
+### Tested
+
+- Full suite: 135 passed, 1 external dependency warning.
+- Baseline `gemma4:e4b`, temperature 0.1, seeds 11/22/33:
+  - 6 of 9 passed;
+  - 0 of 2 retries succeeded;
+  - runtime: 4m 20s.
+- Compact repair prompt with the same configuration:
+  - 8 of 9 passed;
+  - 2 of 2 retries succeeded;
+  - runtime: 3m 36s.
+- Replication with an experimental phrase-based validator:
+  - 6 of 9 passed;
+  - 0 of 1 retries succeeded;
+  - runtime: 3m 52s.
+- Cases 001 and 002 passed 3 of 3 in every benchmark run.
+
+### Findings
+
+- The original repair prompt plus response approached the 4,096-token context limit and produced incomplete retries.
+- All three observed compact-prompt retries returned complete seven-section responses.
+- Semantic repair remained unstable even after structural truncation was removed.
+- Identical seeds did not reproduce identical first responses in the mixed CPU/GPU Ollama runtime, although seed transmission was verified.
+- `case_003` remained the reliable false-positive trap: the model repeatedly invented alternative caller or product requirements.
+
+### Decision
+
+- Keep the multi-seed benchmark CLI, case-stability reporting, and compact repair prompt.
+- Reject and revert the phrase-based state-distinction validator because it did not generalize to model paraphrases.
+- Store all three raw benchmark reports as experiment evidence.
+- Stop adding synonym markers or case-specific prompt rules.
+- Keep the next architecture experiment focused on explicit evidence extraction before judgment.
+
+
+## 2026-07-28 — v1.13.3 Audit Contract Validation and Retry Diagnostics
+
+### Fixed
+
+- Rejected invalid classification, evidence, action, test-status, verdict, and confidence values.
+- Prevented no-finding benchmark cases from passing without `FALSE_POSITIVE_CANDIDATE`.
+
+### Added
+
+- Preserved the first response, retry response, and validation errors for both attempts.
+- Exposed attempt-level diagnostics in evaluation results.
+
+### Tested
+
+- Full suite: 127 passed, 1 external dependency warning.
+- Baseline prompt passed 2 of 3 benchmark cases.
+- Across four Variant B runs, results varied between 2 of 3 and 3 of 3; every run required retry.
+
+### Decision
+
+- Rejected Variant B because it did not reliably improve the first response and risked overfitting to the fixed benchmark.
+- Kept the original prompt, stricter contract validation, corrected scoring, and retry diagnostics.
+
+
 ## 2026-07-28 — v1.13.2 Non-Python Range Audit Crash Fix
 
 ### Fixed

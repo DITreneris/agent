@@ -1,3 +1,5 @@
+import pytest
+
 from audit_validator import validate_audit_output
 
 VALID_RESPONSE = """
@@ -655,3 +657,46 @@ def test_high_evidence_hypothetical_requirement_ignores_quotes():
         "or product requirements."
         in result.errors
     )
+
+
+@pytest.mark.parametrize(
+    ("valid_fragment", "invalid_fragment"),
+    [
+        (
+            "Classification: FALSE_POSITIVE_CANDIDATE",
+            "Classification: BANANA",
+        ),
+        (
+            "Evidence: EVIDENCE_HIGH",
+            "Evidence: CERTAIN",
+        ),
+        (
+            "Recommended action: NO_CHANGE",
+            "Recommended action: SHIP_IT",
+        ),
+        (
+            "Test status: NO_TEST_NEEDED",
+            "Test status: MAYBE",
+        ),
+        (
+            "6. Verdict\nGO",
+            "6. Verdict\nAPPROVE",
+        ),
+        (
+            "7. Confidence\nHigh.",
+            "7. Confidence\nVery High.",
+        ),
+    ],
+)
+def test_invalid_contract_value_is_rejected(
+    valid_fragment,
+    invalid_fragment,
+):
+    response = VALID_RESPONSE.replace(
+        valid_fragment,
+        invalid_fragment,
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
