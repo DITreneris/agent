@@ -16,13 +16,13 @@ authoritative code-review system.
 | Measure | Current evidence |
 |---|---|
 | Development state | Unreleased work after `v1.13.3` |
-| Latest recorded local tests | `135 passed, 1 external dependency warning` |
+| Latest recorded local tests | `149 passed, 1 external dependency warning` |
 | Fixed benchmark | 3 cases × 3 configured seeds |
 | Previous repair prompt | `6 of 9` passed; retries succeeded `0 of 2` |
 | Current compact repair prompt | `8 of 9` passed; retries succeeded `2 of 2` |
 | Remaining unstable case | `case_003_intentional_none_contract` passed `2 of 3` |
 | Historical real-repository pilot | `0 of 5` audits rated useful or partially useful |
-| Current development target | Validate the compact-retry version in real development sessions |
+| Current development target | Collect and replay real field-audit failures during development sessions |
 
 The latest benchmark improved controlled retry behavior, but it does not prove
 that the agent is useful on real repositories.
@@ -76,7 +76,15 @@ Audit evidence and evaluation:
 /audit_stats
 /evaluation_stats
 /rate_audit <id> <label> [outcome] [| note]
+/export_audit_case <id>
 ```
+
+Focused audits preserve selected code, supplied context, prompt hashes, model
+configuration, and both model attempts. `/export_audit_case <id>` writes a
+schema-versioned standalone JSON fixture under `audit_exports/`.
+
+The export directory is gitignored because fixtures may contain private code.
+Offline replay revalidates captured responses; it does not rerun Ollama.
 
 Project inspection:
 
@@ -150,6 +158,8 @@ output was not established.
 - Prompt construction remains mostly string-based.
 - The validator catches known structural and calibration contradictions.
 - Structural validity does not guarantee useful engineering judgment.
+- Offline replay checks validator behavior against captured attempts; it does
+  not reproduce nondeterministic model generation.
 - A local model can restate speculative findings in wording not covered by
   validator rules.
 
@@ -174,9 +184,10 @@ Reject:
 Next validation gate:
 
 1. use the current version during real development sessions;
-2. record useful, low-value, false-positive, and missing-context outcomes;
-3. compare the results with the historical `0/5` pilot;
-4. consider an `Evidence extraction → Judgment` architecture only if repeated
+2. export every material failure as a standalone audit case;
+3. replay captured attempts after validator changes;
+4. record human outcomes and compare them with the historical `0/5` pilot;
+5. consider an `Evidence extraction → Judgment` architecture only if repeated
    failures justify it.
 
 ## Explicit Non-Goals
