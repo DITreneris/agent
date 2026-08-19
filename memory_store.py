@@ -1,7 +1,29 @@
+import json
 import sqlite3
+from dataclasses import dataclass
 from datetime import datetime, UTC
 
 DB_PATH = "memory.db"
+AUDIT_EVIDENCE_SCHEMA_VERSION = 1
+
+
+@dataclass(frozen=True)
+class AuditEvidence:
+    audit_target: str
+    selected_content: str
+    context_content: str
+    context_names: list[str]
+    initial_prompt: str
+    initial_prompt_sha256: str
+    system_prompt_sha256: str
+    model_config: dict[str, object]
+    first_response: str
+    first_validation_errors: list[str]
+    retry_prompt: str | None
+    retry_prompt_sha256: str | None
+    retry_response: str | None
+    retry_validation_errors: list[str]
+
 
 VALID_HUMAN_LABELS = {
     "USEFUL",
@@ -53,6 +75,28 @@ def init_memory_db():
             reviewed_at TEXT,
             response TEXT NOT NULL,
             created_at TEXT NOT NULL
+        )
+        """)
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS audit_evidence (
+            audit_id INTEGER PRIMARY KEY,
+            schema_version INTEGER NOT NULL,
+            audit_target TEXT NOT NULL,
+            selected_content TEXT NOT NULL,
+            context_content TEXT NOT NULL,
+            context_names_json TEXT NOT NULL,
+            initial_prompt TEXT NOT NULL,
+            initial_prompt_sha256 TEXT NOT NULL,
+            system_prompt_sha256 TEXT NOT NULL,
+            retry_prompt TEXT,
+            retry_prompt_sha256 TEXT,
+            model_config_json TEXT NOT NULL,
+            first_response TEXT NOT NULL,
+            first_validation_errors_json TEXT NOT NULL,
+            retry_response TEXT,
+            retry_validation_errors_json TEXT NOT NULL,
+            FOREIGN KEY (audit_id) REFERENCES audit_results(id)
         )
         """)
 
@@ -302,6 +346,7 @@ def create_audit_result(
     retry_used: bool,
     status: str = "accepted",
     validation_errors: list[str] | None = None,
+    evidence: AuditEvidence | None = None,
 ) -> int:
     now = datetime.now(UTC).isoformat()
 
@@ -350,8 +395,69 @@ def create_audit_result(
                 now,
             ),
         )
+        audit_id = cursor.lastrowid
+
+        if evidence is not None:
+            conn.execute(
+                """
+                INSERT INTO audit_evidence (
+                    audit_id,
+                    schema_version,
+                    audit_target,
+                    selected_content,
+                    context_content,
+                    context_names_json,
+                    initial_prompt,
+                    initial_prompt_sha256,
+                    system_prompt_sha256,
+                    retry_prompt,
+                    retry_prompt_sha256,
+                    model_config_json,
+                    first_response,
+                    first_validation_errors_json,
+                    retry_response,
+                    retry_validation_errors_json
+                )
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?
+                )
+                """,
+                (
+                    audit_id,
+                    AUDIT_EVIDENCE_SCHEMA_VERSION,
+                    evidence.audit_target,
+                    evidence.selected_content,
+                    evidence.context_content,
+                    json.dumps(
+                        sorted(evidence.context_names),
+                        ensure_ascii=False,
+                    ),
+                    evidence.initial_prompt,
+                    evidence.initial_prompt_sha256,
+                    evidence.system_prompt_sha256,
+                    evidence.retry_prompt,
+                    evidence.retry_prompt_sha256,
+                    json.dumps(
+                        evidence.model_config,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                    evidence.first_response,
+                    json.dumps(
+                        evidence.first_validation_errors,
+                        ensure_ascii=False,
+                    ),
+                    evidence.retry_response,
+                    json.dumps(
+                        evidence.retry_validation_errors,
+                        ensure_ascii=False,
+                    ),
+                ),
+            )
+
         conn.commit()
-        return cursor.lastrowid
+        return audit_id
 
 
 def rate_audit(
