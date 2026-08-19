@@ -65,6 +65,7 @@ class ValidatedAuditResult:
     retry_validation_errors: list[str] = field(
         default_factory=list
     )
+    retry_prompt: str | None = None
 
 
 def run_validated_audit(
@@ -89,6 +90,7 @@ def run_validated_audit(
             first_validation_errors=[],
             retry_response=None,
             retry_validation_errors=[],
+            retry_prompt=None,
         )
 
     validation_errors = "\n".join(
@@ -119,6 +121,7 @@ def run_validated_audit(
             ),
             retry_response=second_response.strip(),
             retry_validation_errors=[],
+            retry_prompt=repair_prompt,
         )
 
     return ValidatedAuditResult(
@@ -134,4 +137,5 @@ def run_validated_audit(
         retry_validation_errors=list(
             second_validation.errors
         ),
+        retry_prompt=repair_prompt,
     )
