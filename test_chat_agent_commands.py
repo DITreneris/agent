@@ -605,3 +605,78 @@ def test_audit_function_passes_context_names_to_runner(
     assert result == "audit complete"
     assert captured["context_names"] == {"helper"}
     assert captured["context_content"] == prepared.context_content
+
+
+
+def test_export_audit_case_command_exports_fixture(monkeypatch):
+    calls = []
+
+    def fake_export_audit_case(audit_id):
+        calls.append(audit_id)
+        return chat_agent.Path(
+            f"audit_exports/audit_case_{audit_id}.json"
+        )
+
+    monkeypatch.setattr(
+        chat_agent,
+        "export_audit_case",
+        fake_export_audit_case,
+        raising=False,
+    )
+
+    result = handle_memory_command("/export_audit_case 12")
+
+    assert calls == [12]
+    assert result == (
+        "Audit case #12 exported:\n"
+        "audit_exports/audit_case_12.json"
+    )
+
+
+
+def test_export_audit_case_command_handles_invalid_or_unavailable_cases(
+    monkeypatch,
+):
+    invalid_commands = [
+        "/export_audit_case",
+        "/export_audit_case abc",
+        "/export_audit_case 0",
+        "/export_audit_case 1 extra",
+    ]
+
+    for command in invalid_commands:
+        assert handle_memory_command(command) == (
+            "Usage: /export_audit_case <id>"
+        )
+
+    def fake_export_audit_case(audit_id):
+        if audit_id == 404:
+            raise memory_store.AuditCaseNotFoundError(
+                "Audit #404 does not exist."
+            )
+
+        raise memory_store.AuditEvidenceNotFoundError(
+            f"Audit #{audit_id} has no reproducible evidence."
+        )
+
+    monkeypatch.setattr(
+        chat_agent,
+        "export_audit_case",
+        fake_export_audit_case,
+    )
+
+    assert handle_memory_command(
+        "/export_audit_case 404"
+    ) == "Audit #404 does not exist."
+
+    assert handle_memory_command(
+        "/export_audit_case 7"
+    ) == "Audit #7 has no reproducible evidence."
+
+
+
+def test_export_audit_case_command_is_listed_in_help():
+    for command in ["/help", "/unknown_command"]:
+        result = handle_memory_command(command)
+
+        assert "/export_audit_case <id>" in result

@@ -12,6 +12,10 @@ from project_scanner import scan_project_files, format_file_list, read_project_f
 from project_context import build_project_summary
 from prompt_builder import build_system_prompt, build_file_audit_prompt
 from audit_runner import run_validated_audit
+from audit_case import (
+    AuditCaseIntegrityError,
+    export_audit_case,
+)
 
 from audit_model_client import (
     DEFAULT_OLLAMA_AUDIT_CONFIG,
@@ -49,6 +53,8 @@ from memory_store import (
     VALID_HUMAN_LABELS,
     VALID_HUMAN_OUTCOMES,
     get_human_evaluation_stats,
+    AuditCaseNotFoundError,
+    AuditEvidenceNotFoundError,
 )
 
 client = AsyncOpenAI(
@@ -470,6 +476,7 @@ def handle_memory_command(user_input: str):
             "/audit_method <path> <ClassName.method_name>\n"
             "/audit_history [limit]\n"
             "/audit_stats\n"
+            "/export_audit_case <id>\n"
             "/evaluation_stats\n"
             "/rate_audit <id> <label> [outcome] [| note]\n"
         )
@@ -560,6 +567,38 @@ def handle_memory_command(user_input: str):
             lines.append(f"Note: {human_note}")
 
         return "\n".join(lines)
+
+
+    if text.startswith("/export_audit_case"):
+        arguments = (
+            text.removeprefix("/export_audit_case")
+            .strip()
+            .split()
+        )
+
+        if (
+            len(arguments) != 1
+            or not arguments[0].isdigit()
+            or int(arguments[0]) < 1
+        ):
+            return "Usage: /export_audit_case <id>"
+
+        audit_id = int(arguments[0])
+
+        try:
+            exported_path = export_audit_case(audit_id)
+        except (
+            AuditCaseNotFoundError,
+            AuditEvidenceNotFoundError,
+        ) as exc:
+            return str(exc)
+        except (AuditCaseIntegrityError, OSError) as exc:
+            return f"Audit case export failed: {exc}"
+
+        return (
+            f"Audit case #{audit_id} exported:\n"
+            f"{exported_path}"
+        )
 
 
     if text.startswith("/audit_history"):
@@ -1004,6 +1043,7 @@ Return only:
             "/audit_method <path> <ClassName.method_name>\n"
             "/audit_history [limit]\n"
             "/audit_stats\n"
+            "/export_audit_case <id>\n"
             "/evaluation_stats\n"
             "/rate_audit <id> <label> [outcome] [| note]\n"
       )
