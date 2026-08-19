@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import pytest
 import memory_store
@@ -11,6 +12,178 @@ from memory_store import (
     rate_audit,
     get_human_evaluation_stats,
 )
+
+
+def test_init_memory_db_creates_audit_evidence_table(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+
+    memory_store.init_memory_db()
+
+    with sqlite3.connect(test_db) as conn:
+        columns = {
+            row[1]
+            for row in conn.execute(
+                "PRAGMA table_info(audit_evidence)"
+            ).fetchall()
+        }
+
+    assert columns == {
+        "audit_id",
+        "schema_version",
+        "audit_target",
+        "selected_content",
+        "context_content",
+        "context_names_json",
+        "initial_prompt",
+        "initial_prompt_sha256",
+        "system_prompt_sha256",
+        "retry_prompt",
+        "retry_prompt_sha256",
+        "model_config_json",
+        "first_response",
+        "first_validation_errors_json",
+        "retry_response",
+        "retry_validation_errors_json",
+    }
+
+
+def test_create_audit_result_persists_audit_evidence(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    response = (
+        "6. Verdict\nGO\n"
+        "7. Confidence\nHigh"
+    )
+
+    evidence = memory_store.AuditEvidence(
+        audit_target=(
+            "target.py, function parse_name, lines 1-2"
+        ),
+        selected_content=(
+            "1: def parse_name(raw):\n"
+            "2:     return raw"
+        ),
+        context_content=(
+            "def helper():\n"
+            "    return True"
+        ),
+        context_names=["helper"],
+        initial_prompt="Audit captured code.",
+        initial_prompt_sha256="prompt-hash",
+        system_prompt_sha256="system-hash",
+        model_config={
+            "model": "gemma4:e4b",
+            "temperature": 0.1,
+            "seed": 11,
+        },
+        first_response="Invalid first response",
+        first_validation_errors=["Missing sections"],
+        retry_prompt="Repair the audit.",
+        retry_prompt_sha256="retry-hash",
+        retry_response=response,
+        retry_validation_errors=[],
+    )
+
+    audit_id = memory_store.create_audit_result(
+        file_path="target.py",
+        start_line=1,
+        end_line=2,
+        response=response,
+        retry_used=True,
+        evidence=evidence,
+    )
+
+    with sqlite3.connect(test_db) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT *
+            FROM audit_evidence
+            WHERE audit_id = ?
+            """,
+            (audit_id,),
+        ).fetchone()
+
+    assert row is not None
+    assert row["schema_version"] == 1
+    assert row["audit_target"].startswith("target.py")
+    assert row["selected_content"].startswith("1: def")
+    assert row["context_content"].startswith("def helper")
+    assert json.loads(row["context_names_json"]) == ["helper"]
+    assert row["initial_prompt"] == "Audit captured code."
+    assert row["initial_prompt_sha256"] == "prompt-hash"
+    assert row["system_prompt_sha256"] == "system-hash"
+    assert json.loads(row["model_config_json"]) == {
+        "model": "gemma4:e4b",
+        "temperature": 0.1,
+        "seed": 11,
+    }
+    assert row["first_response"] == "Invalid first response"
+    assert json.loads(
+        row["first_validation_errors_json"]
+    ) == ["Missing sections"]
+    assert row["retry_prompt"] == "Repair the audit."
+    assert row["retry_prompt_sha256"] == "retry-hash"
+    assert row["retry_response"] == response
+    assert json.loads(
+        row["retry_validation_errors_json"]
+    ) == []
+
+
+def test_create_audit_result_rolls_back_when_evidence_fails(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    evidence = memory_store.AuditEvidence(
+        audit_target="target.py, lines 1-2",
+        selected_content=None,
+        context_content="",
+        context_names=[],
+        initial_prompt="Audit captured code.",
+        initial_prompt_sha256="prompt-hash",
+        system_prompt_sha256="system-hash",
+        model_config={"model": "gemma4:e4b"},
+        first_response="Invalid response",
+        first_validation_errors=["Missing sections"],
+        retry_prompt=None,
+        retry_prompt_sha256=None,
+        retry_response=None,
+        retry_validation_errors=[],
+    )
+
+    with pytest.raises(sqlite3.IntegrityError):
+        memory_store.create_audit_result(
+            file_path="target.py",
+            start_line=1,
+            end_line=2,
+            response="Invalid response",
+            retry_used=False,
+            evidence=evidence,
+        )
+
+    with sqlite3.connect(test_db) as conn:
+        audit_count = conn.execute(
+            "SELECT COUNT(*) FROM audit_results"
+        ).fetchone()[0]
+        evidence_count = conn.execute(
+            "SELECT COUNT(*) FROM audit_evidence"
+        ).fetchone()[0]
+
+    assert audit_count == 0
+    assert evidence_count == 0
 
 
 def test_create_audit_result(tmp_path, monkeypatch):
@@ -629,3 +802,96 @@ def test_get_human_evaluation_stats_handles_empty_database(
         "label_counts": {},
         "outcome_counts": {},
     }
+
+
+
+def test_get_audit_case_returns_decoded_evidence(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    response = (
+        "6. Verdict\nGO\n"
+        "7. Confidence\nHigh"
+    )
+    evidence = memory_store.AuditEvidence(
+        audit_target="target.py, lines 3-4",
+        selected_content="3: value = normalize(raw)",
+        context_content="def normalize(value):\n    return value.strip()",
+        context_names=["normalize"],
+        initial_prompt="Audit captured code.",
+        initial_prompt_sha256="prompt-hash",
+        system_prompt_sha256="system-hash",
+        model_config={
+            "model": "gemma4:e4b",
+            "temperature": 0.1,
+            "seed": 11,
+        },
+        first_response=response,
+        first_validation_errors=[],
+        retry_prompt=None,
+        retry_prompt_sha256=None,
+        retry_response=None,
+        retry_validation_errors=[],
+    )
+
+    audit_id = memory_store.create_audit_result(
+        file_path="target.py",
+        start_line=3,
+        end_line=4,
+        response=response,
+        retry_used=False,
+        evidence=evidence,
+    )
+
+    audit_case = memory_store.get_audit_case(audit_id)
+
+    assert audit_case.audit_id == audit_id
+    assert audit_case.file_path == "target.py"
+    assert audit_case.start_line == 3
+    assert audit_case.end_line == 4
+    assert audit_case.status == "accepted"
+    assert audit_case.retry_used is False
+    assert audit_case.attempt_count == 1
+    assert audit_case.response == response
+    assert audit_case.schema_version == 1
+    assert audit_case.evidence == evidence
+
+
+
+def test_get_audit_case_distinguishes_missing_and_legacy_audits(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    with pytest.raises(
+        memory_store.AuditCaseNotFoundError,
+        match=r"Audit #999 does not exist\.",
+    ):
+        memory_store.get_audit_case(999)
+
+    legacy_audit_id = memory_store.create_audit_result(
+        file_path="legacy.py",
+        start_line=1,
+        end_line=2,
+        response=(
+            "6. Verdict\nGO\n"
+            "7. Confidence\nHigh"
+        ),
+        retry_used=False,
+    )
+
+    with pytest.raises(
+        memory_store.AuditEvidenceNotFoundError,
+        match=(
+            rf"Audit #{legacy_audit_id} "
+            r"has no reproducible evidence\."
+        ),
+    ):
+        memory_store.get_audit_case(legacy_audit_id)

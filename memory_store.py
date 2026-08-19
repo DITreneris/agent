@@ -1,7 +1,29 @@
+import json
 import sqlite3
+from dataclasses import dataclass
 from datetime import datetime, UTC
 
 DB_PATH = "memory.db"
+AUDIT_EVIDENCE_SCHEMA_VERSION = 1
+
+
+@dataclass(frozen=True)
+class AuditEvidence:
+    audit_target: str
+    selected_content: str
+    context_content: str
+    context_names: list[str]
+    initial_prompt: str
+    initial_prompt_sha256: str
+    system_prompt_sha256: str
+    model_config: dict[str, object]
+    first_response: str
+    first_validation_errors: list[str]
+    retry_prompt: str | None
+    retry_prompt_sha256: str | None
+    retry_response: str | None
+    retry_validation_errors: list[str]
+
 
 VALID_HUMAN_LABELS = {
     "USEFUL",
@@ -17,6 +39,28 @@ VALID_HUMAN_OUTCOMES = {
     "TEST_ADDED",
     "INVESTIGATED_NO_CHANGE",
 }
+
+class AuditCaseNotFoundError(LookupError):
+    pass
+
+
+class AuditEvidenceNotFoundError(LookupError):
+    pass
+
+
+@dataclass(frozen=True)
+class AuditCase:
+    audit_id: int
+    file_path: str
+    start_line: int
+    end_line: int
+    status: str
+    retry_used: bool
+    attempt_count: int
+    response: str
+    schema_version: int
+    evidence: AuditEvidence
+
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -53,6 +97,28 @@ def init_memory_db():
             reviewed_at TEXT,
             response TEXT NOT NULL,
             created_at TEXT NOT NULL
+        )
+        """)
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS audit_evidence (
+            audit_id INTEGER PRIMARY KEY,
+            schema_version INTEGER NOT NULL,
+            audit_target TEXT NOT NULL,
+            selected_content TEXT NOT NULL,
+            context_content TEXT NOT NULL,
+            context_names_json TEXT NOT NULL,
+            initial_prompt TEXT NOT NULL,
+            initial_prompt_sha256 TEXT NOT NULL,
+            system_prompt_sha256 TEXT NOT NULL,
+            retry_prompt TEXT,
+            retry_prompt_sha256 TEXT,
+            model_config_json TEXT NOT NULL,
+            first_response TEXT NOT NULL,
+            first_validation_errors_json TEXT NOT NULL,
+            retry_response TEXT,
+            retry_validation_errors_json TEXT NOT NULL,
+            FOREIGN KEY (audit_id) REFERENCES audit_results(id)
         )
         """)
 
@@ -302,6 +368,7 @@ def create_audit_result(
     retry_used: bool,
     status: str = "accepted",
     validation_errors: list[str] | None = None,
+    evidence: AuditEvidence | None = None,
 ) -> int:
     now = datetime.now(UTC).isoformat()
 
@@ -350,8 +417,151 @@ def create_audit_result(
                 now,
             ),
         )
+        audit_id = cursor.lastrowid
+
+        if evidence is not None:
+            conn.execute(
+                """
+                INSERT INTO audit_evidence (
+                    audit_id,
+                    schema_version,
+                    audit_target,
+                    selected_content,
+                    context_content,
+                    context_names_json,
+                    initial_prompt,
+                    initial_prompt_sha256,
+                    system_prompt_sha256,
+                    retry_prompt,
+                    retry_prompt_sha256,
+                    model_config_json,
+                    first_response,
+                    first_validation_errors_json,
+                    retry_response,
+                    retry_validation_errors_json
+                )
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?
+                )
+                """,
+                (
+                    audit_id,
+                    AUDIT_EVIDENCE_SCHEMA_VERSION,
+                    evidence.audit_target,
+                    evidence.selected_content,
+                    evidence.context_content,
+                    json.dumps(
+                        sorted(evidence.context_names),
+                        ensure_ascii=False,
+                    ),
+                    evidence.initial_prompt,
+                    evidence.initial_prompt_sha256,
+                    evidence.system_prompt_sha256,
+                    evidence.retry_prompt,
+                    evidence.retry_prompt_sha256,
+                    json.dumps(
+                        evidence.model_config,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                    evidence.first_response,
+                    json.dumps(
+                        evidence.first_validation_errors,
+                        ensure_ascii=False,
+                    ),
+                    evidence.retry_response,
+                    json.dumps(
+                        evidence.retry_validation_errors,
+                        ensure_ascii=False,
+                    ),
+                ),
+            )
+
         conn.commit()
-        return cursor.lastrowid
+        return audit_id
+
+
+
+def get_audit_case(audit_id: int) -> AuditCase:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                audit_results.id AS audit_id,
+                audit_results.file_path,
+                audit_results.start_line,
+                audit_results.end_line,
+                audit_results.status,
+                audit_results.retry_used,
+                audit_results.attempt_count,
+                audit_results.response,
+                audit_evidence.schema_version,
+                audit_evidence.audit_target,
+                audit_evidence.selected_content,
+                audit_evidence.context_content,
+                audit_evidence.context_names_json,
+                audit_evidence.initial_prompt,
+                audit_evidence.initial_prompt_sha256,
+                audit_evidence.system_prompt_sha256,
+                audit_evidence.retry_prompt,
+                audit_evidence.retry_prompt_sha256,
+                audit_evidence.model_config_json,
+                audit_evidence.first_response,
+                audit_evidence.first_validation_errors_json,
+                audit_evidence.retry_response,
+                audit_evidence.retry_validation_errors_json
+            FROM audit_results
+            LEFT JOIN audit_evidence
+                ON audit_evidence.audit_id = audit_results.id
+            WHERE audit_results.id = ?
+            """,
+            (audit_id,),
+        ).fetchone()
+
+    if row is None:
+        raise AuditCaseNotFoundError(
+            f"Audit #{audit_id} does not exist."
+        )
+
+    if row["schema_version"] is None:
+        raise AuditEvidenceNotFoundError(
+            f"Audit #{audit_id} has no reproducible evidence."
+        )
+
+    evidence = AuditEvidence(
+        audit_target=row["audit_target"],
+        selected_content=row["selected_content"],
+        context_content=row["context_content"],
+        context_names=json.loads(row["context_names_json"]),
+        initial_prompt=row["initial_prompt"],
+        initial_prompt_sha256=row["initial_prompt_sha256"],
+        system_prompt_sha256=row["system_prompt_sha256"],
+        model_config=json.loads(row["model_config_json"]),
+        first_response=row["first_response"],
+        first_validation_errors=json.loads(
+            row["first_validation_errors_json"]
+        ),
+        retry_prompt=row["retry_prompt"],
+        retry_prompt_sha256=row["retry_prompt_sha256"],
+        retry_response=row["retry_response"],
+        retry_validation_errors=json.loads(
+            row["retry_validation_errors_json"]
+        ),
+    )
+
+    return AuditCase(
+        audit_id=row["audit_id"],
+        file_path=row["file_path"],
+        start_line=row["start_line"],
+        end_line=row["end_line"],
+        status=row["status"],
+        retry_used=bool(row["retry_used"]),
+        attempt_count=row["attempt_count"],
+        response=row["response"],
+        schema_version=row["schema_version"],
+        evidence=evidence,
+    )
 
 
 def rate_audit(

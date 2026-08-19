@@ -2,8 +2,9 @@ from openai import AsyncOpenAI
 from pydantic_ai import Agent, ModelSettings
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
+import hashlib
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from project_config import PROJECT_ROOT
@@ -11,6 +12,10 @@ from project_scanner import scan_project_files, format_file_list, read_project_f
 from project_context import build_project_summary
 from prompt_builder import build_system_prompt, build_file_audit_prompt
 from audit_runner import run_validated_audit
+from audit_case import (
+    AuditCaseIntegrityError,
+    export_audit_case,
+)
 
 from audit_model_client import (
     DEFAULT_OLLAMA_AUDIT_CONFIG,
@@ -32,6 +37,7 @@ from code_chunker import (
 
 
 from memory_store import (
+    AuditEvidence,
     init_memory_db,
     create_memory,
     read_memories,
@@ -47,6 +53,8 @@ from memory_store import (
     VALID_HUMAN_LABELS,
     VALID_HUMAN_OUTCOMES,
     get_human_evaluation_stats,
+    AuditCaseNotFoundError,
+    AuditEvidenceNotFoundError,
 )
 
 client = AsyncOpenAI(
@@ -177,6 +185,12 @@ def run_ollama_audit(
     )
 
 
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(
+        value.encode("utf-8")
+    ).hexdigest()
+
+
 @dataclass(frozen=True)
 class SelectedCodeAuditPreparation:
     file_path: Path
@@ -263,6 +277,7 @@ def run_selected_code_audit(
     selected_content: str,
     context_content: str = "",
     context_names: set[str] | None = None,
+    config: OllamaAuditConfig = DEFAULT_OLLAMA_AUDIT_CONFIG,
 ) -> str:
     full_prompt = build_file_audit_prompt(
         audit_target,
@@ -272,8 +287,38 @@ def run_selected_code_audit(
 
     validated_result = run_validated_audit(
         initial_prompt=full_prompt,
-        model_call=run_ollama_audit,
+        model_call=lambda prompt: run_ollama_audit(
+            prompt,
+            config=config,
+        ),
         available_context_names=context_names,
+    )
+
+    retry_prompt_sha256 = (
+        _sha256_text(validated_result.retry_prompt)
+        if validated_result.retry_prompt is not None
+        else None
+    )
+
+    evidence = AuditEvidence(
+        audit_target=audit_target,
+        selected_content=selected_content,
+        context_content=context_content,
+        context_names=sorted(context_names or set()),
+        initial_prompt=full_prompt,
+        initial_prompt_sha256=_sha256_text(full_prompt),
+        system_prompt_sha256=_sha256_text(SYSTEM_PROMPT),
+        model_config=asdict(config),
+        first_response=validated_result.first_response or "",
+        first_validation_errors=list(
+            validated_result.first_validation_errors
+        ),
+        retry_prompt=validated_result.retry_prompt,
+        retry_prompt_sha256=retry_prompt_sha256,
+        retry_response=validated_result.retry_response,
+        retry_validation_errors=list(
+            validated_result.retry_validation_errors
+        ),
     )
 
     if not validated_result.success:
@@ -285,6 +330,7 @@ def run_selected_code_audit(
             retry_used=validated_result.retry_used,
             status="rejected",
             validation_errors=validated_result.errors,
+            evidence=evidence,
         )
 
         if validated_result.errors:
@@ -307,6 +353,7 @@ def run_selected_code_audit(
         end_line=end_line,
         response=validated_result.response,
         retry_used=validated_result.retry_used,
+        evidence=evidence,
     )
 
     return f"{validated_result.response}\n\nAudit saved: #{audit_id}"
@@ -429,6 +476,7 @@ def handle_memory_command(user_input: str):
             "/audit_method <path> <ClassName.method_name>\n"
             "/audit_history [limit]\n"
             "/audit_stats\n"
+            "/export_audit_case <id>\n"
             "/evaluation_stats\n"
             "/rate_audit <id> <label> [outcome] [| note]\n"
         )
@@ -519,6 +567,38 @@ def handle_memory_command(user_input: str):
             lines.append(f"Note: {human_note}")
 
         return "\n".join(lines)
+
+
+    if text.startswith("/export_audit_case"):
+        arguments = (
+            text.removeprefix("/export_audit_case")
+            .strip()
+            .split()
+        )
+
+        if (
+            len(arguments) != 1
+            or not arguments[0].isdigit()
+            or int(arguments[0]) < 1
+        ):
+            return "Usage: /export_audit_case <id>"
+
+        audit_id = int(arguments[0])
+
+        try:
+            exported_path = export_audit_case(audit_id)
+        except (
+            AuditCaseNotFoundError,
+            AuditEvidenceNotFoundError,
+        ) as exc:
+            return str(exc)
+        except (AuditCaseIntegrityError, OSError) as exc:
+            return f"Audit case export failed: {exc}"
+
+        return (
+            f"Audit case #{audit_id} exported:\n"
+            f"{exported_path}"
+        )
 
 
     if text.startswith("/audit_history"):
@@ -963,6 +1043,7 @@ Return only:
             "/audit_method <path> <ClassName.method_name>\n"
             "/audit_history [limit]\n"
             "/audit_stats\n"
+            "/export_audit_case <id>\n"
             "/evaluation_stats\n"
             "/rate_audit <id> <label> [outcome] [| note]\n"
       )

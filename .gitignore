@@ -9,3 +9,6 @@ memory.db
 *.bak
 .DS_Store
 
+
+# Reproducible audit fixtures may contain private code
+audit_exports/

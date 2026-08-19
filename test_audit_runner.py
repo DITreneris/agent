@@ -45,6 +45,7 @@ def test_invalid_first_response_is_retried_once():
     assert result.errors == []
     assert result.retry_used is True
     assert len(calls) == 2
+    assert result.retry_prompt == calls[1]
     assert "Previous response:" not in calls[1]
     assert "Invalid response" not in calls[1]
     assert "Response must start with '1. Bottom line'." in calls[1]

@@ -1,6 +1,36 @@
 # Changelog
 
 
+## 2026-08-19 — Reproducible Field-Audit Capture (Unreleased)
+
+### Added
+
+- Persisted selected code, supplied context, context names, prompt hashes,
+  model configuration, both responses, and both validation-error lists.
+- Added `/export_audit_case <id>` for deterministic, schema-versioned JSON
+  fixtures.
+- Added offline replay that revalidates both captured attempts without the
+  audit database, original source file, or Ollama.
+- Gitignored `audit_exports/` because fixtures may contain private code.
+
+### Changed
+
+- Preserved the exact retry prompt in validated audit results.
+- Stored audit results and reproducibility evidence in one transaction.
+
+### Tested
+
+- Full suite: 149 passed, 1 external dependency warning.
+- Added a regression that exports an audit, removes its database and source
+  file, and successfully replays the standalone fixture.
+
+### Decision
+
+- Treat replay as validator regression evidence, not deterministic model
+  reproduction.
+- Keep exported field cases local unless explicitly reviewed for disclosure.
+
+
 ## 2026-08-16 — Multi-Seed Benchmark and Retry Diagnostics
 
 ### Added
