@@ -40,6 +40,28 @@ VALID_HUMAN_OUTCOMES = {
     "INVESTIGATED_NO_CHANGE",
 }
 
+class AuditCaseNotFoundError(LookupError):
+    pass
+
+
+class AuditEvidenceNotFoundError(LookupError):
+    pass
+
+
+@dataclass(frozen=True)
+class AuditCase:
+    audit_id: int
+    file_path: str
+    start_line: int
+    end_line: int
+    status: str
+    retry_used: bool
+    attempt_count: int
+    response: str
+    schema_version: int
+    evidence: AuditEvidence
+
+
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -458,6 +480,88 @@ def create_audit_result(
 
         conn.commit()
         return audit_id
+
+
+
+def get_audit_case(audit_id: int) -> AuditCase:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                audit_results.id AS audit_id,
+                audit_results.file_path,
+                audit_results.start_line,
+                audit_results.end_line,
+                audit_results.status,
+                audit_results.retry_used,
+                audit_results.attempt_count,
+                audit_results.response,
+                audit_evidence.schema_version,
+                audit_evidence.audit_target,
+                audit_evidence.selected_content,
+                audit_evidence.context_content,
+                audit_evidence.context_names_json,
+                audit_evidence.initial_prompt,
+                audit_evidence.initial_prompt_sha256,
+                audit_evidence.system_prompt_sha256,
+                audit_evidence.retry_prompt,
+                audit_evidence.retry_prompt_sha256,
+                audit_evidence.model_config_json,
+                audit_evidence.first_response,
+                audit_evidence.first_validation_errors_json,
+                audit_evidence.retry_response,
+                audit_evidence.retry_validation_errors_json
+            FROM audit_results
+            LEFT JOIN audit_evidence
+                ON audit_evidence.audit_id = audit_results.id
+            WHERE audit_results.id = ?
+            """,
+            (audit_id,),
+        ).fetchone()
+
+    if row is None:
+        raise AuditCaseNotFoundError(
+            f"Audit #{audit_id} does not exist."
+        )
+
+    if row["schema_version"] is None:
+        raise AuditEvidenceNotFoundError(
+            f"Audit #{audit_id} has no reproducible evidence."
+        )
+
+    evidence = AuditEvidence(
+        audit_target=row["audit_target"],
+        selected_content=row["selected_content"],
+        context_content=row["context_content"],
+        context_names=json.loads(row["context_names_json"]),
+        initial_prompt=row["initial_prompt"],
+        initial_prompt_sha256=row["initial_prompt_sha256"],
+        system_prompt_sha256=row["system_prompt_sha256"],
+        model_config=json.loads(row["model_config_json"]),
+        first_response=row["first_response"],
+        first_validation_errors=json.loads(
+            row["first_validation_errors_json"]
+        ),
+        retry_prompt=row["retry_prompt"],
+        retry_prompt_sha256=row["retry_prompt_sha256"],
+        retry_response=row["retry_response"],
+        retry_validation_errors=json.loads(
+            row["retry_validation_errors_json"]
+        ),
+    )
+
+    return AuditCase(
+        audit_id=row["audit_id"],
+        file_path=row["file_path"],
+        start_line=row["start_line"],
+        end_line=row["end_line"],
+        status=row["status"],
+        retry_used=bool(row["retry_used"]),
+        attempt_count=row["attempt_count"],
+        response=row["response"],
+        schema_version=row["schema_version"],
+        evidence=evidence,
+    )
 
 
 def rate_audit(

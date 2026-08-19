@@ -802,3 +802,96 @@ def test_get_human_evaluation_stats_handles_empty_database(
         "label_counts": {},
         "outcome_counts": {},
     }
+
+
+
+def test_get_audit_case_returns_decoded_evidence(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    response = (
+        "6. Verdict\nGO\n"
+        "7. Confidence\nHigh"
+    )
+    evidence = memory_store.AuditEvidence(
+        audit_target="target.py, lines 3-4",
+        selected_content="3: value = normalize(raw)",
+        context_content="def normalize(value):\n    return value.strip()",
+        context_names=["normalize"],
+        initial_prompt="Audit captured code.",
+        initial_prompt_sha256="prompt-hash",
+        system_prompt_sha256="system-hash",
+        model_config={
+            "model": "gemma4:e4b",
+            "temperature": 0.1,
+            "seed": 11,
+        },
+        first_response=response,
+        first_validation_errors=[],
+        retry_prompt=None,
+        retry_prompt_sha256=None,
+        retry_response=None,
+        retry_validation_errors=[],
+    )
+
+    audit_id = memory_store.create_audit_result(
+        file_path="target.py",
+        start_line=3,
+        end_line=4,
+        response=response,
+        retry_used=False,
+        evidence=evidence,
+    )
+
+    audit_case = memory_store.get_audit_case(audit_id)
+
+    assert audit_case.audit_id == audit_id
+    assert audit_case.file_path == "target.py"
+    assert audit_case.start_line == 3
+    assert audit_case.end_line == 4
+    assert audit_case.status == "accepted"
+    assert audit_case.retry_used is False
+    assert audit_case.attempt_count == 1
+    assert audit_case.response == response
+    assert audit_case.schema_version == 1
+    assert audit_case.evidence == evidence
+
+
+
+def test_get_audit_case_distinguishes_missing_and_legacy_audits(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    with pytest.raises(
+        memory_store.AuditCaseNotFoundError,
+        match=r"Audit #999 does not exist\.",
+    ):
+        memory_store.get_audit_case(999)
+
+    legacy_audit_id = memory_store.create_audit_result(
+        file_path="legacy.py",
+        start_line=1,
+        end_line=2,
+        response=(
+            "6. Verdict\nGO\n"
+            "7. Confidence\nHigh"
+        ),
+        retry_used=False,
+    )
+
+    with pytest.raises(
+        memory_store.AuditEvidenceNotFoundError,
+        match=(
+            rf"Audit #{legacy_audit_id} "
+            r"has no reproducible evidence\."
+        ),
+    ):
+        memory_store.get_audit_case(legacy_audit_id)
