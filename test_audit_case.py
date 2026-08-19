@@ -240,3 +240,125 @@ def test_export_audit_case_writes_replayable_json(
     assert payload["input"]["selected_content"] == (
         "1: value = normalize(raw)"
     )
+
+
+
+def test_replay_audit_case_without_database_model_or_source(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+    source_path = tmp_path / "deleted_target.py"
+    source_path.write_text(
+        "value = normalize(raw)\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    initial_prompt = "Audit the captured selected code."
+    retry_prompt = "Repair the captured audit."
+    first_response = "Invalid first response"
+    first_errors = [
+        "Response must start with '1. Bottom line'.",
+        "Missing section: '1. Bottom line'.",
+        "Missing section: '2. Direct critique'.",
+        "Missing section: '3. Better option'.",
+        "Missing section: '4. Next steps'.",
+        "Missing section: '5. Top 3 pitfalls'.",
+        "Missing section: '6. Verdict'.",
+        "Missing section: '7. Confidence'.",
+        "Invalid Verdict value: ''.",
+        "Invalid Confidence value: ''.",
+    ]
+    retry_response = """1. Bottom line
+No actionable defect is visible.
+
+2. Direct critique
+Classification: FALSE_POSITIVE_CANDIDATE
+Evidence: EVIDENCE_HIGH
+Why: The captured code and context show the current behavior.
+Missing context: none
+
+3. Better option
+No code change is needed.
+
+4. Next steps
+Recommended action: NO_CHANGE
+Test status: NO_TEST_NEEDED
+Reason: The captured behavior is already explicit.
+
+5. Top 3 pitfalls
+1. Changing behavior without evidence.
+2. Ignoring captured context.
+3. Treating a hypothetical risk as a defect.
+
+6. Verdict
+GO
+
+7. Confidence
+High"""
+
+    evidence = AuditEvidence(
+        audit_target=(
+            "deleted_target.py, function normalize, lines 1-1"
+        ),
+        selected_content="1: value = normalize(raw)",
+        context_content=(
+            "def normalize(value):\n"
+            "    return value.strip()"
+        ),
+        context_names=["normalize"],
+        initial_prompt=initial_prompt,
+        initial_prompt_sha256=sha256_text(initial_prompt),
+        system_prompt_sha256="a" * 64,
+        model_config={
+            "model": "gemma4:e4b",
+            "temperature": 0.1,
+            "seed": 11,
+        },
+        first_response=first_response,
+        first_validation_errors=first_errors,
+        retry_prompt=retry_prompt,
+        retry_prompt_sha256=sha256_text(retry_prompt),
+        retry_response=retry_response,
+        retry_validation_errors=[],
+    )
+    audit_id = memory_store.create_audit_result(
+        file_path=str(source_path),
+        start_line=1,
+        end_line=1,
+        response=retry_response,
+        retry_used=True,
+        evidence=evidence,
+    )
+    exported_path = audit_case.export_audit_case(
+        audit_id,
+        output_dir=tmp_path / "exports",
+    )
+
+    source_path.unlink()
+    test_db.unlink()
+
+    def fail_if_database_is_used(*args, **kwargs):
+        raise AssertionError(
+            "Replay must not read the audit database."
+        )
+
+    monkeypatch.setattr(
+        audit_case,
+        "get_audit_case",
+        fail_if_database_is_used,
+    )
+
+    replay = audit_case.replay_audit_case(exported_path)
+
+    assert source_path.exists() is False
+    assert test_db.exists() is False
+    assert replay.matches_capture is True
+    assert replay.first_valid is False
+    assert replay.first_errors == first_errors
+    assert replay.retry_valid is True
+    assert replay.retry_errors == []
+    assert replay.mismatches == []

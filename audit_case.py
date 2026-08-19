@@ -1,8 +1,14 @@
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
-from memory_store import AuditCase, get_audit_case
+from audit_validator import validate_audit_output
+from memory_store import (
+    AUDIT_EVIDENCE_SCHEMA_VERSION,
+    AuditCase,
+    get_audit_case,
+)
 
 
 AUDIT_CASE_FIXTURE_SCHEMA_VERSION = 1
@@ -10,6 +16,16 @@ AUDIT_CASE_FIXTURE_SCHEMA_VERSION = 1
 
 class AuditCaseIntegrityError(ValueError):
     pass
+
+
+@dataclass(frozen=True)
+class AuditReplayResult:
+    matches_capture: bool
+    first_valid: bool
+    first_errors: list[str]
+    retry_valid: bool | None
+    retry_errors: list[str] | None
+    mismatches: list[str]
 
 
 def _sha256_text(value: str) -> str:
@@ -133,3 +149,128 @@ def export_audit_case(
     )
 
     return output_path
+
+
+
+def _verify_fixture_prompt(
+    prompt: dict[str, object],
+    label: str,
+) -> None:
+    content = prompt.get("content")
+    expected_hash = prompt.get("sha256")
+
+    if (
+        not isinstance(content, str)
+        or not isinstance(expected_hash, str)
+        or _sha256_text(content) != expected_hash
+    ):
+        raise AuditCaseIntegrityError(
+            f"{label} prompt SHA-256 mismatch."
+        )
+
+
+def replay_audit_case(fixture_path: Path) -> AuditReplayResult:
+    fixture_path = Path(fixture_path)
+    payload = json.loads(
+        fixture_path.read_text(encoding="utf-8")
+    )
+
+    fixture_schema_version = payload.get(
+        "fixture_schema_version"
+    )
+    if (
+        fixture_schema_version
+        != AUDIT_CASE_FIXTURE_SCHEMA_VERSION
+    ):
+        raise AuditCaseIntegrityError(
+            "Unsupported audit case fixture schema version: "
+            f"{fixture_schema_version}"
+        )
+
+    evidence_schema_version = payload.get(
+        "evidence_schema_version"
+    )
+    if (
+        evidence_schema_version
+        != AUDIT_EVIDENCE_SCHEMA_VERSION
+    ):
+        raise AuditCaseIntegrityError(
+            "Unsupported audit evidence schema version: "
+            f"{evidence_schema_version}"
+        )
+
+    prompts = payload["prompts"]
+    _verify_fixture_prompt(
+        prompts["initial"],
+        "Initial",
+    )
+
+    retry_prompt = prompts["retry"]
+    if retry_prompt is not None:
+        _verify_fixture_prompt(
+            retry_prompt,
+            "Retry",
+        )
+
+    system_prompt_hash = prompts["system_sha256"]
+    if (
+        not isinstance(system_prompt_hash, str)
+        or len(system_prompt_hash) != 64
+        or any(
+            character not in "0123456789abcdef"
+            for character in system_prompt_hash.lower()
+        )
+    ):
+        raise AuditCaseIntegrityError(
+            "System prompt SHA-256 is invalid."
+        )
+
+    context_names = set(
+        payload["input"]["context_names"]
+    )
+    attempts = payload["attempts"]
+
+    first_attempt = attempts["first"]
+    first_validation = validate_audit_output(
+        first_attempt["response"],
+        available_context_names=context_names,
+    )
+    captured_first_errors = list(
+        first_attempt["validation_errors"]
+    )
+
+    mismatches: list[str] = []
+
+    if first_validation.errors != captured_first_errors:
+        mismatches.append(
+            "First attempt validation errors changed."
+        )
+
+    retry_attempt = attempts["retry"]
+    retry_valid = None
+    retry_errors = None
+
+    if retry_attempt is not None:
+        retry_validation = validate_audit_output(
+            retry_attempt["response"],
+            available_context_names=context_names,
+        )
+        retry_valid = retry_validation.valid
+        retry_errors = list(retry_validation.errors)
+        captured_retry_errors = list(
+            retry_attempt["validation_errors"]
+        )
+
+        if retry_errors != captured_retry_errors:
+            mismatches.append(
+                "Retry attempt validation errors changed."
+            )
+
+    return AuditReplayResult(
+        matches_capture=not mismatches,
+        first_valid=first_validation.valid,
+        first_errors=list(first_validation.errors),
+        retry_valid=retry_valid,
+        retry_errors=retry_errors,
+        mismatches=mismatches,
+    )
