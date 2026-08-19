@@ -2,8 +2,9 @@ from openai import AsyncOpenAI
 from pydantic_ai import Agent, ModelSettings
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
+import hashlib
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from project_config import PROJECT_ROOT
@@ -32,6 +33,7 @@ from code_chunker import (
 
 
 from memory_store import (
+    AuditEvidence,
     init_memory_db,
     create_memory,
     read_memories,
@@ -177,6 +179,12 @@ def run_ollama_audit(
     )
 
 
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(
+        value.encode("utf-8")
+    ).hexdigest()
+
+
 @dataclass(frozen=True)
 class SelectedCodeAuditPreparation:
     file_path: Path
@@ -263,6 +271,7 @@ def run_selected_code_audit(
     selected_content: str,
     context_content: str = "",
     context_names: set[str] | None = None,
+    config: OllamaAuditConfig = DEFAULT_OLLAMA_AUDIT_CONFIG,
 ) -> str:
     full_prompt = build_file_audit_prompt(
         audit_target,
@@ -272,8 +281,38 @@ def run_selected_code_audit(
 
     validated_result = run_validated_audit(
         initial_prompt=full_prompt,
-        model_call=run_ollama_audit,
+        model_call=lambda prompt: run_ollama_audit(
+            prompt,
+            config=config,
+        ),
         available_context_names=context_names,
+    )
+
+    retry_prompt_sha256 = (
+        _sha256_text(validated_result.retry_prompt)
+        if validated_result.retry_prompt is not None
+        else None
+    )
+
+    evidence = AuditEvidence(
+        audit_target=audit_target,
+        selected_content=selected_content,
+        context_content=context_content,
+        context_names=sorted(context_names or set()),
+        initial_prompt=full_prompt,
+        initial_prompt_sha256=_sha256_text(full_prompt),
+        system_prompt_sha256=_sha256_text(SYSTEM_PROMPT),
+        model_config=asdict(config),
+        first_response=validated_result.first_response or "",
+        first_validation_errors=list(
+            validated_result.first_validation_errors
+        ),
+        retry_prompt=validated_result.retry_prompt,
+        retry_prompt_sha256=retry_prompt_sha256,
+        retry_response=validated_result.retry_response,
+        retry_validation_errors=list(
+            validated_result.retry_validation_errors
+        ),
     )
 
     if not validated_result.success:
@@ -285,6 +324,7 @@ def run_selected_code_audit(
             retry_used=validated_result.retry_used,
             status="rejected",
             validation_errors=validated_result.errors,
+            evidence=evidence,
         )
 
         if validated_result.errors:
@@ -307,6 +347,7 @@ def run_selected_code_audit(
         end_line=end_line,
         response=validated_result.response,
         retry_used=validated_result.retry_used,
+        evidence=evidence,
     )
 
     return f"{validated_result.response}\n\nAudit saved: #{audit_id}"

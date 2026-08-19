@@ -1,3 +1,4 @@
+import json
 import sqlite3
 
 import chat_agent
@@ -43,6 +44,13 @@ def test_run_selected_code_audit_saves_rejected_attempt(
                 "EVIDENCE_LOW findings cannot use High confidence."
             ],
             retry_used=True,
+            first_response="Invalid first response",
+            first_validation_errors=["Missing sections"],
+            retry_response="Invalid audit response",
+            retry_validation_errors=[
+                "EVIDENCE_LOW findings cannot use High confidence."
+            ],
+            retry_prompt="Repair prompt",
         ),
     )
 
@@ -83,6 +91,131 @@ def test_run_selected_code_audit_saves_rejected_attempt(
         "EVIDENCE_LOW findings cannot use High confidence."
     )
     assert row[4] == "Invalid audit response"
+
+    evidence_row = conn.execute(
+        """
+        SELECT
+            audit_target,
+            selected_content,
+            context_content,
+            context_names_json,
+            initial_prompt,
+            initial_prompt_sha256,
+            system_prompt_sha256,
+            model_config_json,
+            first_response,
+            first_validation_errors_json,
+            retry_prompt,
+            retry_prompt_sha256,
+            retry_response,
+            retry_validation_errors_json
+        FROM audit_evidence
+        WHERE audit_id = 1
+        """
+    ).fetchone()
+
+    assert evidence_row is not None
+    assert evidence_row[0] == "run_validated_audit"
+    assert evidence_row[1].startswith(
+        "def run_validated_audit"
+    )
+    assert evidence_row[2] == ""
+    assert json.loads(evidence_row[3]) == []
+    assert "focused code audit" in evidence_row[4]
+    assert len(evidence_row[5]) == 64
+    assert len(evidence_row[6]) == 64
+    assert json.loads(evidence_row[7])["model"] == "gemma4:e4b"
+    assert evidence_row[8] == "Invalid first response"
+    assert json.loads(evidence_row[9]) == ["Missing sections"]
+    assert evidence_row[10] == "Repair prompt"
+    assert len(evidence_row[11]) == 64
+    assert evidence_row[12] == "Invalid audit response"
+    assert json.loads(evidence_row[13]) == [
+        "EVIDENCE_LOW findings cannot use High confidence."
+    ]
+
+def test_run_selected_code_audit_saves_accepted_evidence(
+    tmp_path,
+    monkeypatch,
+):
+    test_db = tmp_path / "test_memory.db"
+    monkeypatch.setattr(memory_store, "DB_PATH", str(test_db))
+    memory_store.init_memory_db()
+
+    valid_response = (
+        "1. Bottom line\n"
+        "No actionable defect is visible.\n"
+        "6. Verdict\n"
+        "GO\n"
+        "7. Confidence\n"
+        "High"
+    )
+
+    monkeypatch.setattr(
+        chat_agent,
+        "run_validated_audit",
+        lambda initial_prompt, model_call, available_context_names=None: ValidatedAuditResult(
+            success=True,
+            response=valid_response,
+            errors=[],
+            retry_used=False,
+            first_response=valid_response,
+            first_validation_errors=[],
+            retry_response=None,
+            retry_validation_errors=[],
+            retry_prompt=None,
+        ),
+    )
+
+    result = chat_agent.run_selected_code_audit(
+        file_name="target.py",
+        audit_target="target.py, function safe_parse, lines 1-2",
+        start_line=1,
+        end_line=2,
+        selected_content=(
+            "1: def safe_parse(raw):\n"
+            "2:     return raw"
+        ),
+        context_content=(
+            "def normalize(raw):\n"
+            "    return raw"
+        ),
+        context_names={"normalize"},
+    )
+
+    assert "Audit saved: #1" in result
+
+    with sqlite3.connect(test_db) as conn:
+        row = conn.execute(
+            """
+            SELECT
+                audit_results.status,
+                audit_results.retry_used,
+                audit_evidence.context_names_json,
+                audit_evidence.first_response,
+                audit_evidence.first_validation_errors_json,
+                audit_evidence.retry_prompt,
+                audit_evidence.retry_prompt_sha256,
+                audit_evidence.retry_response,
+                audit_evidence.retry_validation_errors_json
+            FROM audit_results
+            JOIN audit_evidence
+                ON audit_evidence.audit_id = audit_results.id
+            WHERE audit_results.id = 1
+            """
+        ).fetchone()
+
+    assert row is not None
+    assert row[0] == "accepted"
+    assert row[1] == 0
+    assert json.loads(row[2]) == ["normalize"]
+    assert row[3] == valid_response
+    assert json.loads(row[4]) == []
+    assert row[5] is None
+    assert row[6] is None
+    assert row[7] is None
+    assert json.loads(row[8]) == []
+
 
 def test_rate_audit_command_saves_feedback(
     tmp_path,
