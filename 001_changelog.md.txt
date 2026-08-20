@@ -1,5 +1,42 @@
 # Changelog
 
+## 2026-08-20 — Decision-Grade Field Corpus Infrastructure (Unreleased)
+
+### Added
+
+- Extended `AuditCase` with the human label, outcome, note, and review
+  timestamp already stored in the audit database.
+- Added audit fixture schema v2, which preserves human review together with
+  reproducible technical evidence.
+- Added backward-compatible replay for schema v1 fixtures, treating their
+  missing human review as `NOT_REVIEWED`.
+- Added batch replay for one fixture or an `audit_case_*.json` directory.
+- Added `python audit_case.py replay <path>` with deterministic reporting and
+  exit codes for clean replay, replay failures, and invalid input paths.
+
+### Changed
+
+- Replay results now expose audit status and normalized human-review metadata.
+- Field validation now requires consecutive reviewed audits rather than a
+  cherry-picked collection of material failures.
+
+### Tested
+
+- Full suite: 159 passed, 1 external dependency warning.
+- Replayed the existing schema v1 `audit_case_57.json` fixture without the
+  database, source file, or Ollama.
+- Confirmed zero validator drift, zero integrity failures, and exit code `0`
+  for the existing fixture.
+- Added regression coverage for reviewed schema v2 fixtures, schema v1
+  compatibility, mixed batch summaries, integrity failures, formatting, and
+  CLI exit codes.
+
+### Decision
+
+- Keep validator reproducibility separate from human-rated audit usefulness.
+- Export and review every audit in a consecutive field sample, not only
+  failures.
+- Keep `audit_exports/` local because fixtures may contain private code.
 
 ## 2026-08-19 — Reproducible Field-Audit Capture (Unreleased)
 

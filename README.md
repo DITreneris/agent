@@ -16,13 +16,13 @@ authoritative code-review system.
 | Measure | Current evidence |
 |---|---|
 | Development state | Unreleased work after `v1.13.3` |
-| Latest recorded local tests | `149 passed, 1 external dependency warning` |
+| Latest recorded local tests | `159 passed, 1 external dependency warning` |
 | Fixed benchmark | 3 cases × 3 configured seeds |
 | Previous repair prompt | `6 of 9` passed; retries succeeded `0 of 2` |
 | Current compact repair prompt | `8 of 9` passed; retries succeeded `2 of 2` |
 | Remaining unstable case | `case_003_intentional_none_contract` passed `2 of 3` |
 | Historical real-repository pilot | `0 of 5` audits rated useful or partially useful |
-| Current development target | Collect and replay real field-audit failures during development sessions |
+| Current development target | Run and compare consecutive human-reviewed field audits |
 
 The latest benchmark improved controlled retry behavior, but it does not prove
 that the agent is useful on real repositories.
@@ -85,6 +85,17 @@ schema-versioned standalone JSON fixture under `audit_exports/`.
 
 The export directory is gitignored because fixtures may contain private code.
 Offline replay revalidates captured responses; it does not rerun Ollama.
+
+Batch replay:
+
+```bash
+python audit_case.py replay audit_exports/
+```
+
+Fixture schema v2 preserves human review together with technical evidence.
+Schema v1 fixtures remain replayable and are treated as `NOT_REVIEWED`.
+Batch replay returns a non-zero exit code for validator drift, integrity
+failures, or an invalid fixture path.
 
 Project inspection:
 
@@ -183,12 +194,16 @@ Reject:
 
 Next validation gate:
 
-1. use the current version during real development sessions;
-2. export every material failure as a standalone audit case;
-3. replay captured attempts after validator changes;
-4. record human outcomes and compare them with the historical `0/5` pilot;
-5. consider an `Evidence extraction → Judgment` architecture only if repeated
-   failures justify it.
+1. run 5–8 consecutive focused audits without changing the model, prompt, or
+   validator;
+2. investigate and rate every audit immediately after use;
+3. export every case in the sequence, not only material failures;
+4. batch-replay the directory and require zero validator drift and zero
+   integrity failures;
+5. compare useful and partially useful results with the historical `0/5`
+   pilot;
+6. consider the next architecture change only if repeated field evidence
+   justifies it.
 
 ## Explicit Non-Goals
 
