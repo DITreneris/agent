@@ -22,13 +22,19 @@ authoritative code-review system.
 | Current compact repair prompt | `8 of 9` passed; retries succeeded `2 of 2` |
 | Remaining unstable case | `case_003_intentional_none_contract` passed `2 of 3` |
 | Historical real-repository pilot | `0 of 5` audits rated useful or partially useful |
-| Current development target | Run and compare consecutive human-reviewed field audits |
+| Consecutive field sample | `0 of 8` useful or partially useful; `6 of 8` structurally rejected |
+| Current development target | Diagnose clustered structural failures in captured field audits |
+
+The first consecutive eight-audit field sample produced six structurally
+rejected outputs, one accepted low-value output, one accepted
+needs-more-context output, and no useful or partially useful audits. Offline
+replay found zero validator drift and zero fixture-integrity failures.
 
 The latest benchmark improved controlled retry behavior, but it does not prove
 that the agent is useful on real repositories.
 
-The historical production-repository pilot has not yet been rerun after the
-latest changes.
+The historical production-repository pilot has not been rerun. The current
+eight-case field sample used this repository's development code.
 
 ## What We Are Testing
 
@@ -194,16 +200,15 @@ Reject:
 
 Next validation gate:
 
-1. run 5–8 consecutive focused audits without changing the model, prompt, or
-   validator;
-2. investigate and rate every audit immediately after use;
-3. export every case in the sequence, not only material failures;
-4. batch-replay the directory and require zero validator drift and zero
-   integrity failures;
-5. compare useful and partially useful results with the historical `0/5`
-   pilot;
-6. consider the next architecture change only if repeated field evidence
-   justifies it.
+1. inspect the captured first responses, retry prompts, and retry responses for
+   audits `58–65`;
+2. group failures into missing-label, incomplete-output, and duplicated-repair
+   clusters;
+3. implement the smallest shared repair fix without case-specific rules;
+4. rerun the same eight audit targets with unchanged model configuration;
+5. require at least six of eight structurally accepted audits before investing
+   in deeper judgment architecture;
+6. evaluate usefulness only after the structural acceptance gate is restored.
 
 ## Explicit Non-Goals
 
