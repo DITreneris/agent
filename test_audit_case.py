@@ -65,8 +65,14 @@ def test_serialize_audit_case_is_deterministic_and_keeps_both_attempts():
 
     payload = json.loads(first_json)
 
-    assert payload["fixture_schema_version"] == 1
+    assert payload["fixture_schema_version"] == 2
     assert payload["evidence_schema_version"] == 1
+    assert payload["human_review"] == {
+        "label": "NOT_REVIEWED",
+        "outcome": None,
+        "note": None,
+        "reviewed_at": None,
+    }
     assert payload["audit"] == {
         "attempt_count": 2,
         "end_line": 4,
@@ -362,3 +368,193 @@ High"""
     assert replay.retry_valid is True
     assert replay.retry_errors == []
     assert replay.mismatches == []
+
+def test_replay_schema_v1_defaults_to_not_reviewed(tmp_path):
+    initial_prompt = "Audit captured code."
+    valid_response = """1. Bottom line
+No actionable defect is visible.
+
+2. Direct critique
+Classification: FALSE_POSITIVE_CANDIDATE
+Evidence: EVIDENCE_HIGH
+Why: The captured code supports the current behavior.
+Missing context: none
+
+3. Better option
+No code change is needed.
+
+4. Next steps
+Recommended action: NO_CHANGE
+Test status: NO_TEST_NEEDED
+Reason: The behavior is already explicit.
+
+5. Top 3 pitfalls
+1. Changing intentional behavior.
+2. Ignoring captured evidence.
+3. Inventing missing requirements.
+
+6. Verdict
+GO
+
+7. Confidence
+High"""
+
+    payload = {
+        "fixture_schema_version": 1,
+        "evidence_schema_version": 1,
+        "audit": {
+            "status": "accepted",
+        },
+        "input": {
+            "context_names": [],
+        },
+        "prompts": {
+            "system_sha256": "a" * 64,
+            "initial": {
+                "content": initial_prompt,
+                "sha256": sha256_text(initial_prompt),
+            },
+            "retry": None,
+        },
+        "attempts": {
+            "first": {
+                "response": valid_response,
+                "validation_errors": [],
+            },
+            "retry": None,
+        },
+    }
+
+    fixture_path = tmp_path / "audit_case_v1.json"
+    fixture_path.write_text(
+        json.dumps(payload),
+        encoding="utf-8",
+    )
+
+    replay = audit_case.replay_audit_case(fixture_path)
+
+    assert replay.matches_capture is True
+    assert replay.fixture_schema_version == 1
+    assert replay.status == "accepted"
+    assert replay.human_label == "NOT_REVIEWED"
+    assert replay.human_outcome is None
+    assert replay.human_note is None
+    assert replay.reviewed_at is None
+
+@pytest.mark.parametrize(
+    (
+        "human_label",
+        "human_outcome",
+        "human_note",
+    ),
+    [
+        (
+            "FALSE_POSITIVE",
+            "INVESTIGATED_NO_CHANGE",
+            "Existing contract proves the behavior is intentional.",
+        ),
+        (
+            "USEFUL",
+            "CODE_CHANGED",
+            "The audit identified a real defect.",
+        ),
+    ],
+)
+def test_schema_v2_preserves_reviewed_human_feedback(
+    tmp_path,
+    human_label,
+    human_outcome,
+    human_note,
+):
+    initial_prompt = "Audit reviewed code."
+    reviewed_at = "2026-08-20T10:00:00+00:00"
+
+    valid_response = """1. Bottom line
+No unsupported claim is present.
+
+2. Direct critique
+Classification: FALSE_POSITIVE_CANDIDATE
+Evidence: EVIDENCE_HIGH
+Why: The captured code supports the conclusion.
+Missing context: none
+
+3. Better option
+Keep the evidence-backed conclusion.
+
+4. Next steps
+Recommended action: NO_CHANGE
+Test status: NO_TEST_NEEDED
+Reason: The relevant behavior is explicit.
+
+5. Top 3 pitfalls
+1. Ignoring captured evidence.
+2. Inventing missing requirements.
+3. Changing intentional behavior.
+
+6. Verdict
+GO
+
+7. Confidence
+High"""
+
+    evidence = AuditEvidence(
+        audit_target="target.py, function normalize, lines 1-2",
+        selected_content="1: value = normalize(raw)",
+        context_content="",
+        context_names=[],
+        initial_prompt=initial_prompt,
+        initial_prompt_sha256=sha256_text(initial_prompt),
+        system_prompt_sha256="a" * 64,
+        model_config={
+            "model": "gemma4:e4b",
+            "temperature": 0.1,
+            "seed": 11,
+        },
+        first_response=valid_response,
+        first_validation_errors=[],
+        retry_prompt=None,
+        retry_prompt_sha256=None,
+        retry_response=None,
+        retry_validation_errors=[],
+    )
+
+    stored_case = AuditCase(
+        audit_id=42,
+        file_path="target.py",
+        start_line=1,
+        end_line=2,
+        status="accepted",
+        retry_used=False,
+        attempt_count=1,
+        response=valid_response,
+        schema_version=1,
+        evidence=evidence,
+        human_label=human_label,
+        human_outcome=human_outcome,
+        human_note=human_note,
+        reviewed_at=reviewed_at,
+    )
+
+    serialized = serialize_audit_case(stored_case)
+    payload = json.loads(serialized)
+
+    assert payload["fixture_schema_version"] == 2
+    assert payload["human_review"] == {
+        "label": human_label,
+        "outcome": human_outcome,
+        "note": human_note,
+        "reviewed_at": reviewed_at,
+    }
+
+    fixture_path = tmp_path / f"{human_label.lower()}.json"
+    fixture_path.write_text(serialized, encoding="utf-8")
+
+    replay = audit_case.replay_audit_case(fixture_path)
+
+    assert replay.matches_capture is True
+    assert replay.fixture_schema_version == 2
+    assert replay.status == "accepted"
+    assert replay.human_label == human_label
+    assert replay.human_outcome == human_outcome
+    assert replay.human_note == human_note
+    assert replay.reviewed_at == reviewed_at

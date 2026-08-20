@@ -6,12 +6,15 @@ from pathlib import Path
 from audit_validator import validate_audit_output
 from memory_store import (
     AUDIT_EVIDENCE_SCHEMA_VERSION,
+    VALID_HUMAN_LABELS,
+    VALID_HUMAN_OUTCOMES,
     AuditCase,
     get_audit_case,
 )
 
 
-AUDIT_CASE_FIXTURE_SCHEMA_VERSION = 1
+AUDIT_CASE_FIXTURE_SCHEMA_VERSION = 2
+SUPPORTED_AUDIT_CASE_FIXTURE_SCHEMA_VERSIONS = frozenset({1, 2})
 
 
 class AuditCaseIntegrityError(ValueError):
@@ -26,6 +29,12 @@ class AuditReplayResult:
     retry_valid: bool | None
     retry_errors: list[str] | None
     mismatches: list[str]
+    fixture_schema_version: int
+    status: str
+    human_label: str
+    human_outcome: str | None
+    human_note: str | None
+    reviewed_at: str | None
 
 
 def _sha256_text(value: str) -> str:
@@ -89,6 +98,12 @@ def build_audit_case_fixture(
             "retry_used": audit_case.retry_used,
             "attempt_count": audit_case.attempt_count,
             "response": audit_case.response,
+        },
+        "human_review": {
+            "label": audit_case.human_label,
+            "outcome": audit_case.human_outcome,
+            "note": audit_case.human_note,
+            "reviewed_at": audit_case.reviewed_at,
         },
         "input": {
             "audit_target": evidence.audit_target,
@@ -169,6 +184,73 @@ def _verify_fixture_prompt(
         )
 
 
+def _load_fixture_human_review(
+    payload: dict[str, object],
+    fixture_schema_version: int,
+) -> dict[str, str | None]:
+    if fixture_schema_version == 1:
+        return {
+            "label": "NOT_REVIEWED",
+            "outcome": None,
+            "note": None,
+            "reviewed_at": None,
+        }
+
+    human_review = payload.get("human_review")
+
+    if not isinstance(human_review, dict):
+        raise AuditCaseIntegrityError(
+            "Fixture schema v2 requires human_review."
+        )
+
+    label = human_review.get("label")
+    outcome = human_review.get("outcome")
+    note = human_review.get("note")
+    reviewed_at = human_review.get("reviewed_at")
+
+    allowed_labels = VALID_HUMAN_LABELS | {"NOT_REVIEWED"}
+
+    if label not in allowed_labels:
+        raise AuditCaseIntegrityError(
+            f"Invalid human review label: {label!r}."
+        )
+
+    if outcome is not None and outcome not in VALID_HUMAN_OUTCOMES:
+        raise AuditCaseIntegrityError(
+            f"Invalid human review outcome: {outcome!r}."
+        )
+
+    if note is not None and not isinstance(note, str):
+        raise AuditCaseIntegrityError(
+            "Human review note must be text or null."
+        )
+
+    if reviewed_at is not None and not isinstance(reviewed_at, str):
+        raise AuditCaseIntegrityError(
+            "Human review timestamp must be text or null."
+        )
+
+    if label == "NOT_REVIEWED":
+        if any(
+            value is not None
+            for value in (outcome, note, reviewed_at)
+        ):
+            raise AuditCaseIntegrityError(
+                "NOT_REVIEWED cannot contain review details."
+            )
+    elif not reviewed_at:
+        raise AuditCaseIntegrityError(
+            "Reviewed audit requires reviewed_at."
+        )
+
+    return {
+        "label": label,
+        "outcome": outcome,
+        "note": note,
+        "reviewed_at": reviewed_at,
+    }
+
+
 def replay_audit_case(fixture_path: Path) -> AuditReplayResult:
     fixture_path = Path(fixture_path)
     payload = json.loads(
@@ -180,7 +262,7 @@ def replay_audit_case(fixture_path: Path) -> AuditReplayResult:
     )
     if (
         fixture_schema_version
-        != AUDIT_CASE_FIXTURE_SCHEMA_VERSION
+        not in SUPPORTED_AUDIT_CASE_FIXTURE_SCHEMA_VERSIONS
     ):
         raise AuditCaseIntegrityError(
             "Unsupported audit case fixture schema version: "
@@ -198,6 +280,11 @@ def replay_audit_case(fixture_path: Path) -> AuditReplayResult:
             "Unsupported audit evidence schema version: "
             f"{evidence_schema_version}"
         )
+
+    human_review = _load_fixture_human_review(
+        payload,
+        fixture_schema_version,
+    )
 
     prompts = payload["prompts"]
     _verify_fixture_prompt(
@@ -273,4 +360,10 @@ def replay_audit_case(fixture_path: Path) -> AuditReplayResult:
         retry_valid=retry_valid,
         retry_errors=retry_errors,
         mismatches=mismatches,
+        fixture_schema_version=fixture_schema_version,
+        status=payload["audit"]["status"],
+        human_label=human_review["label"],
+        human_outcome=human_review["outcome"],
+        human_note=human_review["note"],
+        reviewed_at=human_review["reviewed_at"],
     )

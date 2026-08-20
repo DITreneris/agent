@@ -847,6 +847,15 @@ def test_get_audit_case_returns_decoded_evidence(
         evidence=evidence,
     )
 
+    reviewed = memory_store.rate_audit(
+        audit_id,
+        "FALSE_POSITIVE",
+        "INVESTIGATED_NO_CHANGE",
+        "Existing contract proves the behavior is intentional.",
+    )
+
+    assert reviewed is True
+
     audit_case = memory_store.get_audit_case(audit_id)
 
     assert audit_case.audit_id == audit_id
@@ -858,6 +867,12 @@ def test_get_audit_case_returns_decoded_evidence(
     assert audit_case.attempt_count == 1
     assert audit_case.response == response
     assert audit_case.schema_version == 1
+    assert audit_case.human_label == "FALSE_POSITIVE"
+    assert audit_case.human_outcome == "INVESTIGATED_NO_CHANGE"
+    assert audit_case.human_note == (
+        "Existing contract proves the behavior is intentional."
+    )
+    assert audit_case.reviewed_at
     assert audit_case.evidence == evidence
 
 
