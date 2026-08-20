@@ -16,19 +16,25 @@ authoritative code-review system.
 | Measure | Current evidence |
 |---|---|
 | Development state | Unreleased work after `v1.13.3` |
-| Latest recorded local tests | `149 passed, 1 external dependency warning` |
+| Latest recorded local tests | `159 passed, 1 external dependency warning` |
 | Fixed benchmark | 3 cases × 3 configured seeds |
 | Previous repair prompt | `6 of 9` passed; retries succeeded `0 of 2` |
 | Current compact repair prompt | `8 of 9` passed; retries succeeded `2 of 2` |
 | Remaining unstable case | `case_003_intentional_none_contract` passed `2 of 3` |
 | Historical real-repository pilot | `0 of 5` audits rated useful or partially useful |
-| Current development target | Collect and replay real field-audit failures during development sessions |
+| Consecutive field sample | `0 of 8` useful or partially useful; `6 of 8` structurally rejected |
+| Current development target | Diagnose clustered structural failures in captured field audits |
+
+The first consecutive eight-audit field sample produced six structurally
+rejected outputs, one accepted low-value output, one accepted
+needs-more-context output, and no useful or partially useful audits. Offline
+replay found zero validator drift and zero fixture-integrity failures.
 
 The latest benchmark improved controlled retry behavior, but it does not prove
 that the agent is useful on real repositories.
 
-The historical production-repository pilot has not yet been rerun after the
-latest changes.
+The historical production-repository pilot has not been rerun. The current
+eight-case field sample used this repository's development code.
 
 ## What We Are Testing
 
@@ -85,6 +91,17 @@ schema-versioned standalone JSON fixture under `audit_exports/`.
 
 The export directory is gitignored because fixtures may contain private code.
 Offline replay revalidates captured responses; it does not rerun Ollama.
+
+Batch replay:
+
+```bash
+python audit_case.py replay audit_exports/
+```
+
+Fixture schema v2 preserves human review together with technical evidence.
+Schema v1 fixtures remain replayable and are treated as `NOT_REVIEWED`.
+Batch replay returns a non-zero exit code for validator drift, integrity
+failures, or an invalid fixture path.
 
 Project inspection:
 
@@ -183,12 +200,15 @@ Reject:
 
 Next validation gate:
 
-1. use the current version during real development sessions;
-2. export every material failure as a standalone audit case;
-3. replay captured attempts after validator changes;
-4. record human outcomes and compare them with the historical `0/5` pilot;
-5. consider an `Evidence extraction → Judgment` architecture only if repeated
-   failures justify it.
+1. inspect the captured first responses, retry prompts, and retry responses for
+   audits `58–65`;
+2. group failures into missing-label, incomplete-output, and duplicated-repair
+   clusters;
+3. implement the smallest shared repair fix without case-specific rules;
+4. rerun the same eight audit targets with unchanged model configuration;
+5. require at least six of eight structurally accepted audits before investing
+   in deeper judgment architecture;
+6. evaluate usefulness only after the structural acceptance gate is restored.
 
 ## Explicit Non-Goals
 

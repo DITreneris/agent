@@ -60,6 +60,10 @@ class AuditCase:
     response: str
     schema_version: int
     evidence: AuditEvidence
+    human_label: str = "NOT_REVIEWED"
+    human_outcome: str | None = None
+    human_note: str | None = None
+    reviewed_at: str | None = None
 
 
 def get_connection():
@@ -496,6 +500,10 @@ def get_audit_case(audit_id: int) -> AuditCase:
                 audit_results.retry_used,
                 audit_results.attempt_count,
                 audit_results.response,
+                audit_results.human_label,
+                audit_results.human_outcome,
+                audit_results.human_note,
+                audit_results.reviewed_at,
                 audit_evidence.schema_version,
                 audit_evidence.audit_target,
                 audit_evidence.selected_content,
@@ -561,6 +569,10 @@ def get_audit_case(audit_id: int) -> AuditCase:
         response=row["response"],
         schema_version=row["schema_version"],
         evidence=evidence,
+        human_label=row["human_label"],
+        human_outcome=row["human_outcome"],
+        human_note=row["human_note"],
+        reviewed_at=row["reviewed_at"],
     )
 
 
