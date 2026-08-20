@@ -16,22 +16,30 @@ authoritative code-review system.
 | Measure | Current evidence |
 |---|---|
 | Development state | Unreleased work after `v1.13.3` |
-| Latest recorded local tests | `159 passed, 1 external dependency warning` |
+| Latest recorded local tests | `160 passed, 1 external dependency warning` |
 | Fixed benchmark | 3 cases × 3 configured seeds |
 | Previous repair prompt | `6 of 9` passed; retries succeeded `0 of 2` |
 | Current compact repair prompt | `8 of 9` passed; retries succeeded `2 of 2` |
 | Remaining unstable case | `case_003_intentional_none_contract` passed `2 of 3` |
 | Historical real-repository pilot | `0 of 5` audits rated useful or partially useful |
-| Consecutive field sample | `0 of 8` useful or partially useful; `6 of 8` structurally rejected |
-| Current development target | Diagnose clustered structural failures in captured field audits |
+| Consecutive field sample at `4096` | `0 of 8` useful or partially useful; `6 of 8` structurally rejected |
+| Context-window A/B | `4096`: `0 of 9` accepted; `8192`: `8 of 9` accepted |
+| Field rerun at `8192` | `6 of 8` accepted; `1 of 8` partially useful; `0 of 8` useful |
+| Current development target | Improve reviewer judgment under an adequate context budget |
 
-The first consecutive eight-audit field sample produced six structurally
-rejected outputs, one accepted low-value output, one accepted
-needs-more-context output, and no useful or partially useful audits. Offline
-replay found zero validator drift and zero fixture-integrity failures.
+The first consecutive eight-audit field sample at the default `4096`
+context produced six structurally rejected outputs and no useful or partially
+useful audits. Offline replay found zero validator drift and zero
+fixture-integrity failures.
 
-The latest benchmark improved controlled retry behavior, but it does not prove
-that the agent is useful on real repositories.
+A controlled field A/B then showed that `8192` context materially improves
+structural reliability: acceptance increased from `0 of 9` to `8 of 9` across
+the same three cases and seeds. A consecutive eight-case rerun accepted six
+outputs, including four on the first attempt.
+
+Human review still found zero useful outputs, one partially useful output,
+three low-value outputs, and four false positives. The larger context resolved
+most structural failures but did not make reviewer judgment reliable.
 
 The historical production-repository pilot has not been rerun. The current
 eight-case field sample used this repository's development code.
@@ -185,6 +193,7 @@ output was not established.
 Keep:
 
 - the multi-seed benchmark CLI;
+- configurable context size and Ollama attempt diagnostics;
 - per-case stability summaries;
 - raw response and retry diagnostics;
 - the compact standalone repair prompt;
@@ -196,19 +205,20 @@ Reject:
 - the phrase-based state-distinction validator;
 - additional synonym markers;
 - case-specific prompt rules;
-- treating `8/9` as proof of real-repository usefulness.
+- treating structural acceptance as proof of real-repository usefulness;
+- an immediate typed-output renderer before judgment improves.
 
 Next validation gate:
 
-1. inspect the captured first responses, retry prompts, and retry responses for
-   audits `58–65`;
-2. group failures into missing-label, incomplete-output, and duplicated-repair
-   clusters;
-3. implement the smallest shared repair fix without case-specific rules;
-4. rerun the same eight audit targets with unchanged model configuration;
-5. require at least six of eight structurally accepted audits before investing
-   in deeper judgment architecture;
-6. evaluate usefulness only after the structural acceptance gate is restored.
+1. keep `gemma4:e4b` and use `8192` context for judgment experiments;
+2. build a small mixed corpus containing known actionable defects and
+   known-safe targets;
+3. supply only directly relevant schema, type, caller, or test context;
+4. do not change the output contract, validator, and judgment rules in the same
+   experiment;
+5. require at least four of five correct action decisions and zero
+   high-confidence false positives;
+6. change the production context default only after human usefulness improves.
 
 ## Explicit Non-Goals
 

@@ -1,5 +1,68 @@
 # Changelog
 
+## 2026-08-20 — Context-Window Field Experiment (Unreleased)
+
+### Added
+
+- Added configurable `num_ctx` to `OllamaAuditConfig`, preserving `4096` as
+  the default.
+- Added a backward-compatible Ollama response path that preserves
+  `prompt_eval_count`, `eval_count`, and `done_reason`.
+- Added regression coverage for default and custom context sizes and response
+  metadata.
+
+### Tested
+
+- Full suite: 160 passed, 1 external dependency warning.
+- Ran cases `58–60` across seeds `11`, `22`, and `33` with the same model,
+  temperature, prompts, retry behavior, and validator:
+  - `4096` context: 0 of 9 structurally accepted;
+  - `8192` context: 8 of 9 structurally accepted;
+  - acceptance improvement: 8 of 9;
+  - total runtime increased from 255.4 to 302.9 seconds, approximately 1.19x.
+- At `4096`, the first smoke case evaluated only 2,051 input tokens for both
+  the initial and longer retry prompts.
+- At `8192`, the same case evaluated 4,098 and 4,487 input tokens and passed
+  structural validation after retry.
+- Reran consecutive field cases `58–65` at `8192`, seed `11`:
+  - 6 of 8 structurally accepted;
+  - 4 accepted on the first attempt;
+  - 2 accepted after retry;
+  - 2 remained structurally rejected.
+- Blind human review of the eight new outputs:
+  - 0 useful;
+  - 1 partially useful;
+  - 3 low-value;
+  - 4 false positives;
+  - 0 needs-more-context.
+- The predefined usefulness gate of at least 2 of 8 useful or partially useful
+  was not met.
+
+### Findings
+
+- The 4,096-token context limit was a major cause of clustered structural
+  failures.
+- Increasing context to 8,192 materially improved structural acceptance with
+  a modest runtime cost on the tested local GPU configuration.
+- Structural validity still did not produce reliable engineering judgment.
+- Remaining failures included invented requirements, repeated theoretical
+  risks, severity inflation, generic hardening advice, and missed caller,
+  schema, or type context.
+- A smaller typed output is no longer the highest-ROI next experiment because
+  output structure became sufficiently reliable at 8,192 context.
+
+### Decision
+
+- Keep configurable context size and Ollama response diagnostics.
+- Keep `4096` as the default until a production change passes the usefulness
+  gate.
+- Do not treat the successful structural result as evidence that the reviewer
+  is ready for practical use.
+- Do not proceed directly to a typed-output renderer.
+- If experimentation continues, test reviewer judgment at `8192` using a
+  mixed decision-grade corpus and targeted schema, type, and caller context.
+- Keep structural and human-usefulness gates separate.
+
 ## 2026-08-20 — Retry Structure and Model-Size Field Experiment (Unreleased)
 
 ### Tested
