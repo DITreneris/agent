@@ -1,5 +1,44 @@
 # Changelog
 
+## 2026-08-20 — Retry Structure and Model-Size Field Experiment (Unreleased)
+
+### Tested
+
+- Replayed field cases `58–65` with zero validator drift and zero integrity
+  failures.
+- Grouped the six rejected retries into overlapping structural failure
+  categories: four were missing required labels, two were incomplete, and two
+  duplicated output sections.
+- Replaced the 1,609-character repair prompt with a 765-character wrapper and
+  an explicit required-label skeleton.
+- Confirmed 49 targeted runner and validator tests passed.
+- Ran a representative three-case field pilot against cases `58–60`.
+- The compact repair prompt accepted zero of three cases and was reverted.
+- Re-ran the same three cases with the original production prompt:
+  - `gemma4:e4b`: zero of three accepted in 79.2 seconds;
+  - `gemma4:12b`: zero of three accepted in 248.3 seconds.
+
+### Findings
+
+- Missing labels were a frequent symptom, but not a sufficient shared root
+  cause.
+- The compact repair prompt changed failure forms without improving structural
+  acceptance.
+- Failures still included incomplete output, invalid enum values, duplicated
+  sections, and JSON or code-fence output.
+- `gemma4:12b` was approximately 3.1 times slower than `gemma4:e4b` and
+  produced no structural acceptance improvement.
+- Increasing model size did not solve the current output-contract failure.
+
+### Decision
+
+- Reject and revert the compact required-label repair prompt.
+- Keep `gemma4:e4b` as the production baseline.
+- Do not switch to `gemma4:12b`.
+- Stop further retry-prompt tuning and model-size escalation for this failure.
+- Test a materially smaller output contract next, without simultaneously
+  changing context retrieval or judgment rules.
+
 ## 2026-08-20 — Decision-Grade Field Corpus Infrastructure (Unreleased)
 
 ### Added
