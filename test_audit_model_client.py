@@ -5,12 +5,22 @@ import chat_agent
 from audit_model_client import (
     OllamaAuditConfig,
     call_ollama_audit,
+    call_ollama_audit_with_metadata,
 )
 
 
 class FakeResponse:
-    def __init__(self, content: str) -> None:
+    def __init__(
+        self,
+        content: str,
+        prompt_eval_count: int | None = None,
+        eval_count: int | None = None,
+        done_reason: str | None = None,
+    ) -> None:
         self.content = content
+        self.prompt_eval_count = prompt_eval_count
+        self.eval_count = eval_count
+        self.done_reason = done_reason
 
     def __enter__(self):
         return self
@@ -22,7 +32,10 @@ class FakeResponse:
         payload = {
             "message": {
                 "content": self.content,
-            }
+            },
+            "prompt_eval_count": self.prompt_eval_count,
+            "eval_count": self.eval_count,
+            "done_reason": self.done_reason,
         }
         return json.dumps(payload).encode("utf-8")
 
@@ -67,6 +80,7 @@ def test_call_ollama_audit_uses_default_config(
     ]
     assert payload["options"] == {
         "temperature": 0.1,
+        "num_ctx": 4096,
     }
 
 
@@ -89,6 +103,7 @@ def test_call_ollama_audit_uses_custom_config(
         model="test-model",
         temperature=0.0,
         seed=42,
+        num_ctx=8192,
         timeout_seconds=12,
         base_url="http://localhost:9999/api/chat",
     )
@@ -108,8 +123,36 @@ def test_call_ollama_audit_uses_custom_config(
     assert payload["model"] == "test-model"
     assert payload["options"] == {
         "temperature": 0.0,
+        "num_ctx": 8192,
         "seed": 42,
     }
+
+def test_call_ollama_audit_preserves_response_metadata(
+    monkeypatch,
+) -> None:
+    def fake_urlopen(request, timeout):
+        return FakeResponse(
+            "Measured response",
+            prompt_eval_count=3210,
+            eval_count=240,
+            done_reason="stop",
+        )
+
+    monkeypatch.setattr(
+        "audit_model_client.urllib.request.urlopen",
+        fake_urlopen,
+    )
+
+    result = call_ollama_audit_with_metadata(
+        prompt="Audit prompt",
+        system_prompt="System prompt",
+    )
+
+    assert result.content == "Measured response"
+    assert result.prompt_eval_count == 3210
+    assert result.eval_count == 240
+    assert result.done_reason == "stop"
+
 
 def test_chat_agent_delegates_to_configurable_client(
     monkeypatch,
