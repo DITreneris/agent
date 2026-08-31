@@ -1,7 +1,7 @@
 {
-  "id": "case_002_real_none_bug",
+  "id": "case_004_empty_average_bug",
   "command": "audit_function",
-  "symbol": "get_name",
+  "symbol": "average_score",
   "expected_decision": "CHANGE",
   "allowed_actions": [
     "FIX_NOW"
@@ -13,24 +13,24 @@
     "High",
     "Medium"
   ],
-  "ground_truth": "dict.get returns None when name is missing, and calling strip on None raises AttributeError. The visible execution path proves a current runtime defect.",
+  "ground_truth": "The list type permits an empty list. When scores is empty, len(scores) is zero and the visible expression raises ZeroDivisionError.",
   "expected_verdicts": [
     "GO_WITH_NOTES",
     "BLOCK"
   ],
-  "forbidden_claims": [],
   "required_keyword_groups": [
     [
-      "name",
-      "missing"
+      "empty",
+      "scores"
     ],
     [
-      "none",
-      "strip"
-    ],
-    [
-      "attributeerror"
+      "zero",
+      "division"
     ]
+  ],
+  "forbidden_claims": [
+    "caller guarantees non-empty scores",
+    "empty scores are impossible"
   ],
   "required_finding_labels": [
     "REAL_BUG"

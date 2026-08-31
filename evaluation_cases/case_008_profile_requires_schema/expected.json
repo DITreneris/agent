@@ -1,0 +1,28 @@
+{
+  "id": "case_008_profile_requires_schema",
+  "command": "audit_function",
+  "symbol": "format_display_name",
+  "expected_decision": "INSPECT_CONTEXT",
+  "allowed_actions": [
+    "INSPECT_CONTEXT"
+  ],
+  "expected_classifications": [
+    "NEEDS_CONTEXT"
+  ],
+  "allowed_confidence": [
+    "Medium",
+    "Low"
+  ],
+  "ground_truth": "The generic dict annotation does not reveal whether display_name is required or always a string. The profile schema or validated construction path is needed before deciding whether the direct access and strip call require a code change.",
+  "expected_verdicts": [
+    "GO_WITH_NOTES"
+  ],
+  "forbidden_claims": [
+    "display_name is definitely missing",
+    "display_name is always a string",
+    "profile always contains display_name"
+  ],
+  "required_finding_labels": [
+    "NEEDS_CONTEXT"
+  ]
+}
