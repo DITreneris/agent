@@ -140,9 +140,11 @@ def test_run_cli_writes_multi_seed_json_without_real_model(
         "false_positive_count": 0,
         "false_negative_count": 0,
         "high_confidence_false_positive_count": 0,
-        "abstention_total": 0,
-        "correct_abstentions": 0,
-        "abstention_accuracy": 0.0,
+        "context_required_runs": 0,
+        "actual_inspect_context_runs": 0,
+        "correct_inspect_context_runs": 0,
+        "inspect_context_recall": 0.0,
+        "inspect_context_precision": 0.0,
     }
 
     assert report["benchmark_gate"] == {
@@ -1056,9 +1058,11 @@ def test_summarize_decision_scores() -> None:
         "false_positive_count": 1,
         "false_negative_count": 1,
         "high_confidence_false_positive_count": 1,
-        "abstention_total": 1,
-        "correct_abstentions": 1,
-        "abstention_accuracy": 1.0,
+        "context_required_runs": 1,
+        "actual_inspect_context_runs": 1,
+        "correct_inspect_context_runs": 1,
+        "inspect_context_recall": 1.0,
+        "inspect_context_precision": 1.0,
     }
 
 def test_score_rejects_disallowed_decision_contract_values() -> None:
@@ -1278,3 +1282,36 @@ def test_summarize_benchmark_gate_rejects_failed_thresholds() -> None:
     assert gate["structural_validation_gate"] is False
 
     assert gate["passed"] is False
+
+
+def test_summarize_decision_scores_separates_context_metrics() -> None:
+    scores = [
+        {
+            "expected_decision": "INSPECT_CONTEXT",
+            "actual_decision": "INSPECT_CONTEXT",
+            "decision_correct": True,
+            "high_confidence_false_positive": False,
+        },
+        {
+            "expected_decision": "INSPECT_CONTEXT",
+            "actual_decision": "CHANGE",
+            "decision_correct": False,
+            "high_confidence_false_positive": False,
+        },
+        {
+            "expected_decision": "NO_CHANGE",
+            "actual_decision": "INSPECT_CONTEXT",
+            "decision_correct": False,
+            "high_confidence_false_positive": False,
+        },
+    ]
+
+    summary = summarize_decision_scores(scores)
+
+    assert summary["context_required_runs"] == 2
+    assert summary["actual_inspect_context_runs"] == 2
+    assert summary["correct_inspect_context_runs"] == 1
+    assert summary["inspect_context_recall"] == 0.5
+    assert summary["inspect_context_precision"] == 0.5
+    assert "abstention_total" not in summary
+    assert "abstention_accuracy" not in summary

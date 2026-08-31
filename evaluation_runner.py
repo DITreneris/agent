@@ -358,17 +358,23 @@ def summarize_decision_scores(scores: list[dict]) -> dict:
         if score.get("high_confidence_false_positive") is True
     )
 
-    abstention_scores = [
+    context_required_scores = [
         score
         for score in scored
         if score.get("expected_decision") == "INSPECT_CONTEXT"
     ]
-    abstention_total = len(abstention_scores)
-    correct_abstentions = sum(
+    context_required_runs = len(context_required_scores)
+    actual_inspect_context_runs = sum(
         1
-        for score in abstention_scores
+        for score in scored
         if score.get("actual_decision") == "INSPECT_CONTEXT"
     )
+    correct_inspect_context_runs = sum(
+        1
+        for score in context_required_scores
+        if score.get("actual_decision") == "INSPECT_CONTEXT"
+    )
+
 
     return {
         "total_scored": total_scored,
@@ -384,13 +390,27 @@ def summarize_decision_scores(scores: list[dict]) -> dict:
         "high_confidence_false_positive_count": (
             high_confidence_false_positive_count
         ),
-        "abstention_total": abstention_total,
-        "correct_abstentions": correct_abstentions,
-        "abstention_accuracy": (
-            correct_abstentions / abstention_total
-            if abstention_total
+
+        "context_required_runs": context_required_runs,
+        "actual_inspect_context_runs": (
+            actual_inspect_context_runs
+        ),
+        "correct_inspect_context_runs": (
+            correct_inspect_context_runs
+        ),
+        "inspect_context_recall": (
+            correct_inspect_context_runs
+            / context_required_runs
+            if context_required_runs
             else 0.0
         ),
+        "inspect_context_precision": (
+            correct_inspect_context_runs
+            / actual_inspect_context_runs
+            if actual_inspect_context_runs
+            else 0.0
+        ),
+
     }
 
 def summarize_case_stability(
