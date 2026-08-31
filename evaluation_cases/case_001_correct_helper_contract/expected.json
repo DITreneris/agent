@@ -2,6 +2,19 @@
   "id": "case_001_correct_helper_contract",
   "command": "audit_function",
   "symbol": "parse_optional_age",
+  "expected_decision": "NO_CHANGE",
+  "allowed_actions": [
+    "NO_CHANGE",
+    "DO_NOT_FIX"
+  ],
+  "expected_classifications": [
+    "FALSE_POSITIVE_CANDIDATE"
+  ],
+  "allowed_confidence": [
+    "High",
+    "Medium"
+  ],
+  "ground_truth": "The visible same-file helper returns None for an empty value and parse_optional_age preserves that explicit contract. No current defect or justified code change is visible.",
   "expected_verdicts": [
     "GO"
   ],

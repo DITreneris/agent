@@ -1,0 +1,28 @@
+{
+  "id": "case_006_idempotent_cleanup",
+  "command": "audit_function",
+  "symbol": "remove_cache_file",
+  "expected_decision": "NO_CHANGE",
+  "allowed_actions": [
+    "NO_CHANGE",
+    "DO_NOT_FIX"
+  ],
+  "expected_classifications": [
+    "FALSE_POSITIVE_CANDIDATE"
+  ],
+  "allowed_confidence": [
+    "High",
+    "Medium"
+  ],
+  "ground_truth": "Path.unlink with missing_ok=True intentionally makes cleanup safe when the file is already absent. A separate existence check is not required and would introduce a check-then-act race.",
+  "expected_verdicts": [
+    "GO"
+  ],
+  "required_keyword_groups": [
+    [
+      "missing_ok",
+      "true"
+    ]
+  ],
+  "expected_no_findings": true
+}

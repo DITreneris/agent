@@ -1,0 +1,37 @@
+{
+  "id": "case_007_timeout_requires_caller",
+  "command": "audit_function",
+  "symbol": "parse_timeout",
+  "expected_decision": "INSPECT_CONTEXT",
+  "allowed_actions": [
+    "INSPECT_CONTEXT"
+  ],
+  "expected_classifications": [
+    "NEEDS_CONTEXT"
+  ],
+  "allowed_confidence": [
+    "Medium",
+    "Low"
+  ],
+  "ground_truth": "The conversion is correct for numeric text and raises ValueError for other strings. The visible function does not show whether callers validate input or intentionally rely on that exception contract, so a code change is not yet justified.",
+  "expected_verdicts": [
+    "GO_WITH_NOTES"
+  ],
+  "required_keyword_groups": [
+    [
+      "valueerror"
+    ],
+    [
+      "caller",
+      "validation"
+    ]
+  ],
+  "forbidden_claims": [
+    "invalid input is definitely a bug",
+    "parse_timeout must return zero",
+    "the caller never validates input"
+  ],
+  "required_finding_labels": [
+    "NEEDS_CONTEXT"
+  ]
+}

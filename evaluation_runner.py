@@ -8,7 +8,12 @@ from pathlib import Path
 
 from audit_model_client import OllamaAuditConfig
 from audit_runner import ValidatedAuditResult, run_validated_audit
-from audit_validator import _extract_verdict
+
+from audit_validator import (
+    _extract_confidence,
+    _extract_verdict,
+)
+
 from chat_agent import prepare_selected_code_audit, run_ollama_audit
 from code_chunker import find_python_function_range
 from prompt_builder import build_file_audit_prompt
@@ -101,16 +106,100 @@ def _extract_finding_labels(response: str) -> list[str]:
     return labels
 
 
+def extract_recommended_action(response: str) -> str:
+    in_next_steps = False
+
+    for line in response.splitlines():
+        normalized = line.strip()
+
+        if normalized == "4. Next steps":
+            in_next_steps = True
+            continue
+
+        if normalized == "5. Top 3 pitfalls":
+            break
+
+        if not in_next_steps:
+            continue
+
+        if normalized.startswith("- "):
+            normalized = normalized[2:].strip()
+
+        prefix = "Recommended action:"
+
+        if normalized.startswith(prefix):
+            return normalized[len(prefix):].strip()
+
+    return ""
+
+
+def map_action_to_decision(action: str) -> str:
+    action_decisions = {
+        "FIX_NOW": "CHANGE",
+        "HARDEN_SMALL": "CHANGE",
+        "ADD_TEST_CONFIRMED": "CHANGE",
+        "REFACTOR_LATER": "CHANGE",
+        "NO_CHANGE": "NO_CHANGE",
+        "DO_NOT_FIX": "NO_CHANGE",
+        "INSPECT_CONTEXT": "INSPECT_CONTEXT",
+    }
+
+    return action_decisions.get(action, "UNKNOWN")
+
+
 def score_evaluation_result(
     case: dict,
     result: ValidatedAuditResult,
 ) -> dict:
     response = result.response or ""
     verdict = _extract_verdict(response)
+    confidence = _extract_confidence(response)
+
+    recommended_action = extract_recommended_action(response)
+    actual_decision = map_action_to_decision(
+        recommended_action
+    )
+    expected_decision = case.get("expected_decision")
+
+    decision_correct = (
+        None
+        if expected_decision is None
+        else actual_decision == expected_decision
+    )
+
+    high_confidence_false_positive = (
+        expected_decision == "NO_CHANGE"
+        and actual_decision == "CHANGE"
+        and confidence == "High"
+    )
 
     verdict_pass = verdict in case["expected_verdicts"]
 
     finding_labels_found = _extract_finding_labels(response)
+
+    allowed_actions = case.get("allowed_actions")
+    allowed_action_pass = (
+        allowed_actions is None
+        or recommended_action in allowed_actions
+    )
+
+    expected_classifications = case.get(
+        "expected_classifications"
+    )
+    expected_classifications_pass = (
+        expected_classifications is None
+        or all(
+            classification in finding_labels_found
+            for classification in expected_classifications
+        )
+    )
+
+    allowed_confidence = case.get("allowed_confidence")
+    allowed_confidence_pass = (
+        allowed_confidence is None
+        or confidence in allowed_confidence
+    )
+
 
     no_findings_pass = True
     if case.get("expected_no_findings") is True:
@@ -173,8 +262,21 @@ def score_evaluation_result(
         "case_id": case["id"],
         "audit_valid": result.success,
         "verdict": verdict,
+        "confidence": confidence,
+        "recommended_action": recommended_action,
+        "expected_decision": expected_decision,
+        "actual_decision": actual_decision,
+        "decision_correct": decision_correct,
+        "high_confidence_false_positive": (
+            high_confidence_false_positive
+        ),
         "verdict_pass": verdict_pass,
         "finding_labels_found": finding_labels_found,
+        "allowed_action_pass": allowed_action_pass,
+        "expected_classifications_pass": (
+            expected_classifications_pass
+        ),
+        "allowed_confidence_pass": allowed_confidence_pass,
         "no_findings_pass": no_findings_pass,
         "missing_required_finding_labels": (
             missing_required_finding_labels
@@ -200,6 +302,10 @@ def score_evaluation_result(
             and required_claims_pass
             and required_keyword_groups_pass
             and forbidden_claims_pass
+            and decision_correct is not False
+            and allowed_action_pass
+            and expected_classifications_pass
+            and allowed_confidence_pass
         ),
     }
 
@@ -216,6 +322,76 @@ def summarize_evaluation_scores(scores: list[dict]) -> dict:
         "pass_rate": passed / total if total else 0.0,
     }
 
+
+def summarize_decision_scores(scores: list[dict]) -> dict:
+    scored = [
+        score
+        for score in scores
+        if score.get("expected_decision") is not None
+    ]
+
+    total_scored = len(scored)
+    correct_decisions = sum(
+        1
+        for score in scored
+        if score.get("decision_correct") is True
+    )
+    incorrect_decisions = total_scored - correct_decisions
+
+    false_positive_count = sum(
+        1
+        for score in scored
+        if score.get("expected_decision") == "NO_CHANGE"
+        and score.get("actual_decision") == "CHANGE"
+    )
+
+    false_negative_count = sum(
+        1
+        for score in scored
+        if score.get("expected_decision") == "CHANGE"
+        and score.get("actual_decision") != "CHANGE"
+    )
+
+    high_confidence_false_positive_count = sum(
+        1
+        for score in scored
+        if score.get("high_confidence_false_positive") is True
+    )
+
+    abstention_scores = [
+        score
+        for score in scored
+        if score.get("expected_decision") == "INSPECT_CONTEXT"
+    ]
+    abstention_total = len(abstention_scores)
+    correct_abstentions = sum(
+        1
+        for score in abstention_scores
+        if score.get("actual_decision") == "INSPECT_CONTEXT"
+    )
+
+    return {
+        "total_scored": total_scored,
+        "correct_decisions": correct_decisions,
+        "incorrect_decisions": incorrect_decisions,
+        "decision_accuracy": (
+            correct_decisions / total_scored
+            if total_scored
+            else 0.0
+        ),
+        "false_positive_count": false_positive_count,
+        "false_negative_count": false_negative_count,
+        "high_confidence_false_positive_count": (
+            high_confidence_false_positive_count
+        ),
+        "abstention_total": abstention_total,
+        "correct_abstentions": correct_abstentions,
+        "abstention_accuracy": (
+            correct_abstentions / abstention_total
+            if abstention_total
+            else 0.0
+        ),
+    }
 
 def summarize_case_stability(
     scores: list[dict],
@@ -286,8 +462,215 @@ def summarize_case_stability(
             }
         )
 
+        expected_decision = next(
+            (
+                score.get("expected_decision")
+                for score in case_scores
+                if score.get("expected_decision") is not None
+            ),
+            None,
+        )
+
+        if expected_decision is not None:
+            decision_counts: dict[str, int] = {}
+
+            for score in case_scores:
+                actual_decision = (
+                    score.get("actual_decision")
+                    or "UNKNOWN"
+                )
+                decision_counts[actual_decision] = (
+                    decision_counts.get(actual_decision, 0) + 1
+                )
+
+            majority_count = max(
+                decision_counts.values(),
+                default=0,
+            )
+            majority_candidates = [
+                decision
+                for decision, count in decision_counts.items()
+                if count == majority_count
+            ]
+            majority_decision = (
+                majority_candidates[0]
+                if len(majority_candidates) == 1
+                else None
+            )
+            correct_decision_runs = sum(
+                1
+                for score in case_scores
+                if score.get("decision_correct") is True
+            )
+            high_confidence_false_positive_runs = sum(
+                1
+                for score in case_scores
+                if score.get(
+                    "high_confidence_false_positive",
+                    False,
+                )
+            )
+
+            summaries[-1].update(
+                {
+                    "expected_decision": expected_decision,
+                    "decision_counts": decision_counts,
+                    "majority_decision": majority_decision,
+                    "majority_count": majority_count,
+                    "majority_decision_correct": (
+                        majority_decision == expected_decision
+                    ),
+                    "correct_decision_runs": correct_decision_runs,
+                    "decision_accuracy": (
+                        correct_decision_runs / total_runs
+                        if total_runs
+                        else 0.0
+                    ),
+                    "stable_decision": (
+                        total_runs >= 2
+                        and len(decision_counts) == 1
+                    ),
+                    "high_confidence_false_positive_runs": (
+                        high_confidence_false_positive_runs
+                    ),
+                }
+            )
+
     return summaries
 
+def summarize_benchmark_gate(
+    scores: list[dict],
+) -> dict:
+    case_summaries = summarize_case_stability(scores)
+    decision_cases = [
+        summary
+        for summary in case_summaries
+        if summary.get("expected_decision") is not None
+    ]
+
+    majority_correct_cases = sum(
+        1
+        for summary in decision_cases
+        if summary["majority_decision_correct"]
+    )
+
+    change_case_summaries = [
+        summary
+        for summary in decision_cases
+        if summary["expected_decision"] == "CHANGE"
+    ]
+    change_cases_correct = sum(
+        1
+        for summary in change_case_summaries
+        if (
+            summary["majority_decision"] == "CHANGE"
+            and summary["majority_count"] >= 2
+        )
+    )
+
+    no_change_case_summaries = [
+        summary
+        for summary in decision_cases
+        if summary["expected_decision"] == "NO_CHANGE"
+    ]
+    no_change_cases_correct = sum(
+        1
+        for summary in no_change_case_summaries
+        if summary["majority_decision"] == "NO_CHANGE"
+    )
+
+    high_confidence_false_positive_count = sum(
+        1
+        for score in scores
+        if score.get(
+            "high_confidence_false_positive",
+            False,
+        )
+    )
+
+    total_runs = len(scores)
+    structurally_valid_runs = sum(
+        1
+        for score in scores
+        if score.get("audit_valid", False)
+    )
+    structural_validation_rate = (
+        structurally_valid_runs / total_runs
+        if total_runs
+        else 0.0
+    )
+
+    minimum_majority_correct_cases = 6
+    required_change_cases_correct = 3
+    required_no_change_cases_correct = 2
+    minimum_structural_validation_rate = 0.75
+
+    majority_case_gate = (
+        majority_correct_cases
+        >= minimum_majority_correct_cases
+    )
+    change_case_gate = (
+        change_cases_correct
+        >= required_change_cases_correct
+    )
+    no_change_case_gate = (
+        no_change_cases_correct
+        >= required_no_change_cases_correct
+    )
+    high_confidence_false_positive_gate = (
+        high_confidence_false_positive_count == 0
+    )
+    structural_validation_gate = (
+        structural_validation_rate
+        >= minimum_structural_validation_rate
+    )
+
+    return {
+        "total_cases": len(decision_cases),
+        "majority_correct_cases": majority_correct_cases,
+        "minimum_majority_correct_cases": (
+            minimum_majority_correct_cases
+        ),
+        "majority_case_gate": majority_case_gate,
+        "change_cases": len(change_case_summaries),
+        "change_cases_correct": change_cases_correct,
+        "required_change_cases_correct": (
+            required_change_cases_correct
+        ),
+        "change_case_gate": change_case_gate,
+        "no_change_cases": len(no_change_case_summaries),
+        "no_change_cases_correct": no_change_cases_correct,
+        "required_no_change_cases_correct": (
+            required_no_change_cases_correct
+        ),
+        "no_change_case_gate": no_change_case_gate,
+        "high_confidence_false_positive_count": (
+            high_confidence_false_positive_count
+        ),
+        "high_confidence_false_positive_gate": (
+            high_confidence_false_positive_gate
+        ),
+        "total_runs": total_runs,
+        "structurally_valid_runs": structurally_valid_runs,
+        "structural_validation_rate": (
+            structural_validation_rate
+        ),
+        "minimum_structural_validation_rate": (
+            minimum_structural_validation_rate
+        ),
+        "structural_validation_gate": (
+            structural_validation_gate
+        ),
+        "passed": all(
+            (
+                majority_case_gate,
+                change_case_gate,
+                no_change_case_gate,
+                high_confidence_false_positive_gate,
+                structural_validation_gate,
+            )
+        ),
+    }
 
 def run_evaluation_case(
     case: dict,
@@ -391,6 +774,11 @@ def parse_cli_args(
         default=0.1,
     )
     parser.add_argument(
+        "--num-ctx",
+        type=int,
+        default=4096,
+    )
+    parser.add_argument(
         "--seeds",
         type=parse_seed_list,
         default=None,
@@ -420,6 +808,7 @@ def run_cli(argv: list[str] | None = None) -> int:
             model=args.model,
             temperature=args.temperature,
             seed=seed,
+            num_ctx=args.num_ctx,
         )
         model_call = partial(
             run_ollama_audit,
@@ -451,14 +840,25 @@ def run_cli(argv: list[str] | None = None) -> int:
 
     summary = summarize_evaluation_scores(all_scores)
 
+    decision_summary = summarize_decision_scores(
+        all_scores
+    )
+
+    benchmark_gate = summarize_benchmark_gate(
+        all_scores
+    )
+
     report = {
         "metadata": {
             "model": args.model,
             "temperature": args.temperature,
+            "num_ctx": args.num_ctx,
             "seeds": seeds,
             "run_count": len(seeds),
         },
         "summary": summary,
+        "decision_summary": decision_summary,
+        "benchmark_gate": benchmark_gate,
         "case_stability": summarize_case_stability(
             all_scores
         ),

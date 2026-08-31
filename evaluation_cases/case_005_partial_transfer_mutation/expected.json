@@ -1,0 +1,42 @@
+{
+  "id": "case_005_partial_transfer_mutation",
+  "command": "audit_function",
+  "symbol": "transfer_balance",
+  "expected_decision": "CHANGE",
+  "allowed_actions": [
+    "FIX_NOW"
+  ],
+  "expected_classifications": [
+    "REAL_BUG"
+  ],
+  "allowed_confidence": [
+    "High",
+    "Medium"
+  ],
+  "ground_truth": "If source contains balance but target does not, the source balance is decreased before target access raises KeyError. The failed transfer leaves partially mutated state.",
+  "expected_verdicts": [
+    "GO_WITH_NOTES",
+    "BLOCK"
+  ],
+  "required_keyword_groups": [
+    [
+      "source",
+      "balance"
+    ],
+    [
+      "target",
+      "balance"
+    ],
+    [
+      "keyerror"
+    ]
+  ],
+  "forbidden_claims": [
+    "target always contains balance",
+    "caller validates the target",
+    "partial mutation is impossible"
+  ],
+  "required_finding_labels": [
+    "REAL_BUG"
+  ]
+}

@@ -2,6 +2,19 @@
   "id": "case_003_intentional_none_contract",
   "command": "audit_function",
   "symbol": "calculate_discount",
+  "expected_decision": "NO_CHANGE",
+  "allowed_actions": [
+    "NO_CHANGE",
+    "DO_NOT_FIX"
+  ],
+  "expected_classifications": [
+    "FALSE_POSITIVE_CANDIDATE"
+  ],
+  "allowed_confidence": [
+    "High",
+    "Medium"
+  ],
+  "ground_truth": "calculate_discount explicitly checks whether the helper returned None and maps that sentinel to zero. The missing-code path is intentionally and safely handled.",
   "expected_verdicts": [
     "GO"
   ],
