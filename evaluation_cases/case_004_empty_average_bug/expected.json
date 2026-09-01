@@ -13,7 +13,7 @@
     "High",
     "Medium"
   ],
-  "ground_truth": "The list type permits an empty list. When scores is empty, len(scores) is zero and the visible expression raises ZeroDivisionError.",
+  "ground_truth": "The visible function contract requires 0.0 when scores is empty. The current expression divides by zero for that input and directly violates the stated contract.",
   "expected_verdicts": [
     "GO_WITH_NOTES",
     "BLOCK"

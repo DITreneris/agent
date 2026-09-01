@@ -13,7 +13,7 @@
     "High",
     "Medium"
   ],
-  "ground_truth": "If source contains balance but target does not, the source balance is decreased before target access raises KeyError. The failed transfer leaves partially mutated state.",
+  "ground_truth": "The visible contract requires atomic transfer behavior. If target lacks balance, source is decreased before target access raises KeyError, leaving partially mutated state and directly violating that contract.",
   "expected_verdicts": [
     "GO_WITH_NOTES",
     "BLOCK"

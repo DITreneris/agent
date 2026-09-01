@@ -160,6 +160,10 @@ def test_run_cli_writes_multi_seed_json_without_real_model(
         "no_change_cases_correct": 1,
         "required_no_change_cases_correct": 2,
         "no_change_case_gate": False,
+        "context_cases": 0,
+        "context_cases_correct": 0,
+        "required_context_cases_correct": 1,
+        "context_case_gate": False,
         "high_confidence_false_positive_count": 0,
         "high_confidence_false_positive_gate": True,
         "total_runs": 3,
@@ -1205,6 +1209,10 @@ def test_summarize_benchmark_gate_passes_at_locked_thresholds() -> None:
         "no_change_cases_correct": 3,
         "required_no_change_cases_correct": 2,
         "no_change_case_gate": True,
+        "context_cases": 2,
+        "context_cases_correct": 2,
+        "required_context_cases_correct": 1,
+        "context_case_gate": True,
         "high_confidence_false_positive_count": 0,
         "high_confidence_false_positive_gate": True,
         "total_runs": 24,
@@ -1282,6 +1290,125 @@ def test_summarize_benchmark_gate_rejects_failed_thresholds() -> None:
     assert gate["structural_validation_gate"] is False
 
     assert gate["passed"] is False
+
+
+def test_benchmark_gate_rejects_zero_context_recall_at_six_of_eight(
+) -> None:
+    expected_decisions = {
+        "case_001": "NO_CHANGE",
+        "case_002": "CHANGE",
+        "case_003": "NO_CHANGE",
+        "case_004": "CHANGE",
+        "case_005": "CHANGE",
+        "case_006": "NO_CHANGE",
+        "case_007": "INSPECT_CONTEXT",
+        "case_008": "INSPECT_CONTEXT",
+    }
+    scores = []
+
+    for case_id, expected_decision in expected_decisions.items():
+        actual_decision = (
+            "CHANGE"
+            if expected_decision == "INSPECT_CONTEXT"
+            else expected_decision
+        )
+        decision_correct = (
+            actual_decision == expected_decision
+        )
+
+        for _ in range(3):
+            scores.append(
+                {
+                    "case_id": case_id,
+                    "passed": decision_correct,
+                    "audit_valid": True,
+                    "verdict": "GO",
+                    "retry_used": False,
+                    "expected_decision": expected_decision,
+                    "actual_decision": actual_decision,
+                    "decision_correct": decision_correct,
+                    "high_confidence_false_positive": False,
+                }
+            )
+
+    gate = summarize_benchmark_gate(scores)
+
+    assert gate["majority_correct_cases"] == 6
+    assert gate["majority_case_gate"] is True
+    assert gate["change_case_gate"] is True
+    assert gate["no_change_case_gate"] is True
+    assert gate["structural_validation_gate"] is True
+    assert (
+        gate["high_confidence_false_positive_gate"]
+        is True
+    )
+    assert gate["context_cases"] == 2
+    assert gate["context_cases_correct"] == 0
+    assert gate["context_case_gate"] is False
+    assert gate["passed"] is False
+
+
+def test_benchmark_gate_accepts_one_of_two_context_cases(
+) -> None:
+    expected_decisions = {
+        "case_001": "NO_CHANGE",
+        "case_002": "CHANGE",
+        "case_003": "NO_CHANGE",
+        "case_004": "CHANGE",
+        "case_005": "CHANGE",
+        "case_006": "NO_CHANGE",
+        "case_007": "INSPECT_CONTEXT",
+        "case_008": "INSPECT_CONTEXT",
+    }
+    scores = []
+
+    for case_id, expected_decision in expected_decisions.items():
+        for run_index in range(3):
+            if case_id == "case_007":
+                actual_decision = (
+                    "INSPECT_CONTEXT"
+                    if run_index < 2
+                    else "CHANGE"
+                )
+            elif case_id == "case_008":
+                actual_decision = "CHANGE"
+            else:
+                actual_decision = expected_decision
+
+            decision_correct = (
+                actual_decision == expected_decision
+            )
+
+            scores.append(
+                {
+                    "case_id": case_id,
+                    "passed": decision_correct,
+                    "audit_valid": True,
+                    "verdict": "GO",
+                    "retry_used": False,
+                    "expected_decision": expected_decision,
+                    "actual_decision": actual_decision,
+                    "decision_correct": decision_correct,
+                    "high_confidence_false_positive": False,
+                }
+            )
+
+    gate = summarize_benchmark_gate(scores)
+
+    assert gate["majority_correct_cases"] == 7
+    assert gate["majority_case_gate"] is True
+    assert gate["change_case_gate"] is True
+    assert gate["no_change_case_gate"] is True
+    assert gate["context_cases"] == 2
+    assert gate["context_cases_correct"] == 1
+    assert gate["required_context_cases_correct"] == 1
+    assert gate["context_case_gate"] is True
+    assert gate["structural_validation_gate"] is True
+    assert (
+        gate["high_confidence_false_positive_gate"]
+        is True
+    )
+    assert gate["passed"] is True
 
 
 def test_summarize_decision_scores_separates_context_metrics() -> None:

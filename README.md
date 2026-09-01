@@ -16,16 +16,28 @@ authoritative code-review system.
 | Measure | Current evidence |
 |---|---|
 | Development state | Unreleased work after `v1.13.3` |
-| Latest recorded local tests | `160 passed, 1 external dependency warning` |
-| Fixed benchmark | 3 cases × 3 configured seeds |
-| Previous repair prompt | `6 of 9` passed; retries succeeded `0 of 2` |
-| Current compact repair prompt | `8 of 9` passed; retries succeeded `2 of 2` |
-| Remaining unstable case | `case_003_intentional_none_contract` passed `2 of 3` |
+| Latest recorded local tests | `172 passed, 1 external dependency warning` |
+| Decision benchmark v2 | 8 cases × 3 seeds; 24 runs |
+| Correct majority decisions | `6 of 8`; overall gate failed |
+| Structural validity | `24 of 24` |
+| Proven defects | `3 of 3` cases; `9 of 9` runs received CHANGE |
+| Safe targets | `3 of 3` correct by majority |
+| Context-required targets | `0 of 2` by majority; `0 of 6` runs used INSPECT_CONTEXT |
+| High-confidence false positives | `1` |
 | Historical real-repository pilot | `0 of 5` audits rated useful or partially useful |
 | Consecutive field sample at `4096` | `0 of 8` useful or partially useful; `6 of 8` structurally rejected |
 | Context-window A/B | `4096`: `0 of 9` accepted; `8192`: `8 of 9` accepted |
 | Field rerun at `8192` | `6 of 8` accepted; `1 of 8` partially useful; `0 of 8` useful |
-| Current development target | Improve reviewer judgment under an adequate context budget |
+| Current development target | Improve the evidence boundary without weakening defect recall |
+
+The contract-grounded decision benchmark v2 produced structurally valid
+outputs in all 24 runs and correct majority decisions in six of eight cases.
+The benchmark still failed because neither context-required target received
+`INSPECT_CONTEXT`, and one safe run produced a high-confidence false positive.
+
+The remaining bottleneck is reviewer judgment: the model treats a reachable
+exception as a confirmed defect when the visible code does not establish the
+relevant caller, schema, type, or error contract.
 
 The first consecutive eight-audit field sample at the default `4096`
 context produced six structurally rejected outputs and no useful or partially
@@ -144,28 +156,35 @@ files. Prefer a focused line, function, or method audit.
 
 ## Fixed Benchmark
 
-Run the current three-case benchmark with three configured seeds:
+Run the current eight-case decision benchmark with three configured seeds:
 
 ```bash
 python evaluation_runner.py \
   --model gemma4:e4b \
   --temperature 0.1 \
+  --num-ctx 8192 \
   --seeds 11,22,33 \
-  --output /tmp/critique-agent-benchmark.json
+  --output /tmp/decision-grade-benchmark.json
 ```
 
-### Recorded Results
+### Contract-Grounded v2 Baseline
 
-| Experiment | Result | Retry result | Decision |
-|---|---:|---:|---|
-| Original repair prompt | `6/9` | `0/2` | Replaced |
-| Compact repair prompt | `8/9` | `2/2` | Kept |
-| Compact prompt + phrase-based state validator | `6/9` | `0/1` | Reverted |
+| Gate | Result |
+|---|---:|
+| At least 6/8 correct majority decisions | PASS — `6/8` |
+| All 3 proven defects majority CHANGE | PASS — `3/3` |
+| At least 2/3 safe cases majority NO_CHANGE | PASS — `3/3` |
+| At least 1/2 context cases majority INSPECT_CONTEXT | FAIL — `0/2` |
+| Zero high-confidence false positives | FAIL — `1` |
+| At least 75% structurally valid outputs | PASS — `100%` |
 
-Cases 001 and 002 passed `3/3` in every recorded multi-seed run.
+The overall benchmark gate failed. A `6/8` majority score is not sufficient
+when context recall remains zero.
 
-Case 003 remains the false-positive trap. The model still invents alternative
-caller or product requirements for an intentional `None` contract.
+Case 003 passed by majority, but only two of three runs were correct and both
+correct runs required structural retry. Cases 007 and 008 received
+`FIX_NOW`, `BLOCK`, and High confidence in every seed instead of requesting
+caller or schema context.
 
 Configured seeds did not produce identical first responses in the mixed
 CPU/GPU Ollama runtime. Seed transmission was verified, but deterministic model
@@ -210,15 +229,17 @@ Reject:
 
 Next validation gate:
 
-1. keep `gemma4:e4b` and use `8192` context for judgment experiments;
-2. build a small mixed corpus containing known actionable defects and
-   known-safe targets;
-3. supply only directly relevant schema, type, caller, or test context;
-4. do not change the output contract, validator, and judgment rules in the same
-   experiment;
-5. require at least four of five correct action decisions and zero
-   high-confidence false positives;
-6. change the production context default only after human usefulness improves.
+1. keep the contract-grounded eight-case corpus, `gemma4:e4b`, `8192`
+   context, temperature `0.1`, and seeds `11`, `22`, and `33`;
+2. change one variable only: the evidence boundary in the focused audit
+   prompt;
+3. preserve all three defect majorities and at least two safe-case
+   majorities;
+4. require at least one of two context cases to receive
+   `INSPECT_CONTEXT` by majority;
+5. require zero high-confidence false positives and at least 75% structural
+   validity;
+6. run a real-repository field sample only after the synthetic gate passes.
 
 ## Explicit Non-Goals
 
@@ -242,6 +263,8 @@ Do not add unless repeated real usage proves the need:
 - [Original multi-seed benchmark](evaluation_results/gemma4_e4b_t01_seeds_11_22_33.json)
 - [Compact-retry benchmark](evaluation_results/gemma4_e4b_t01_seeds_11_22_33_compact_retry.json)
 - [Reverted validator experiment](evaluation_results/gemma4_e4b_t01_seeds_11_22_33_compact_retry_state_validator.json)
+- [Contract-grounded benchmark v2 report](evaluation_results/decision_grade_benchmark_v2_baseline.md)
+- [Contract-grounded benchmark v2 evidence](evaluation_results/decision_grade_benchmark_v2_baseline.json)
 
 ## License
 
