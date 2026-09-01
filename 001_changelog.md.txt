@@ -1,5 +1,70 @@
 # Changelog
 
+## 2026-09-01 — Contract-Grounded Decision Benchmark v2 (Unreleased)
+
+### Added
+
+- Added a dedicated context-decision benchmark gate.
+- Required at least one of two context-required cases to receive
+  `INSPECT_CONTEXT` in at least two of three runs.
+- Added regression coverage proving that a `6/8` majority result cannot pass
+  while context recall remains zero.
+- Added boundary coverage proving that one correct context-case majority
+  satisfies the locked context threshold when every other gate passes.
+- Made the intended behavior of the three actionable defect fixtures explicit
+  in visible type or function contracts.
+- Added a contract-grounded 24-run baseline report and raw JSON evidence.
+
+### Tested
+
+- Full suite: 172 passed, 1 external dependency warning.
+- Evaluation runner suite: 31 passed.
+- Model: `gemma4:e4b`.
+- Temperature: `0.1`.
+- Context size: `8192`.
+- Seeds: `11`, `22`, and `33`.
+- Cases: 8.
+- Total runs: 24.
+- Model-run commit: `cb08a96`.
+- Structurally valid outputs: 24 of 24.
+- Correct run-level decisions: 17 of 24.
+- Correct majority decisions: 6 of 8.
+- Proven defects: 3 of 3 cases and 9 of 9 runs received `CHANGE`.
+- Safe targets: 3 of 3 correct by majority.
+- Context-required targets: 0 of 2 correct by majority.
+- Correct `INSPECT_CONTEXT` runs: 0 of 6.
+- High-confidence false positives: 1.
+- Overall benchmark gate: failed.
+- Result SHA256:
+  `2de3bb230892692184711d5582c508bb9a39518aa33f0e6c793e005f72294508`.
+
+### Findings
+
+- Structural reliability is no longer the limiting factor.
+- The reviewer still treats a reachable exception as a confirmed defect when
+  the visible code does not establish the caller, schema, type, or
+  error-handling contract.
+- Both context-required cases produced `FIX_NOW`, `BLOCK`, and High confidence
+  in all three seeds.
+- Case 003 passed by majority, but two correct runs required structural retry.
+- The apparent case 003 improvement over v1 cannot be attributed to the
+  contract-grounded fixture changes because that case was not changed.
+- The new context gate correctly prevents the `6/8` majority result from being
+  misreported as a reviewer pass.
+
+### Decision
+
+- Keep the contract-grounded corpus and context-decision gate.
+- Treat benchmark v2 as a valid failed reviewer baseline.
+- Do not change the validator, retry logic, model, context size, or seeds in
+  the next experiment.
+- Change one variable only next: the evidence boundary in the focused audit
+  prompt.
+- Require at least one correct context-case majority, zero high-confidence
+  false positives, preserved defect recall, and at least 75% structural
+  validity.
+- Run a real-repository field sample only after the synthetic gate passes.
+
 ## 2026-08-20 — Context-Window Field Experiment (Unreleased)
 
 ### Added
