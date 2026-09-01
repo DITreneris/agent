@@ -3,5 +3,6 @@ def transfer_balance(
     target: dict[str, int],
     amount: int,
 ) -> None:
+    """Transfer atomically; failure must not partially mutate accounts."""
     source["balance"] -= amount
     target["balance"] += amount

@@ -13,7 +13,7 @@
     "High",
     "Medium"
   ],
-  "ground_truth": "dict.get returns None when name is missing, and calling strip on None raises AttributeError. The visible execution path proves a current runtime defect.",
+  "ground_truth": "The visible type permits name to be None, while the function contract requires an empty string when name is absent. Calling strip on None raises AttributeError and directly violates that visible contract.",
   "expected_verdicts": [
     "GO_WITH_NOTES",
     "BLOCK"
