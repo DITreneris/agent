@@ -599,6 +599,24 @@ def summarize_benchmark_gate(
         if summary["majority_decision"] == "NO_CHANGE"
     )
 
+    context_case_summaries = [
+        summary
+        for summary in decision_cases
+        if (
+            summary["expected_decision"]
+            == "INSPECT_CONTEXT"
+        )
+    ]
+    context_cases_correct = sum(
+        1
+        for summary in context_case_summaries
+        if (
+            summary["majority_decision"]
+            == "INSPECT_CONTEXT"
+            and summary["majority_count"] >= 2
+        )
+    )
+
     high_confidence_false_positive_count = sum(
         1
         for score in scores
@@ -623,6 +641,7 @@ def summarize_benchmark_gate(
     minimum_majority_correct_cases = 6
     required_change_cases_correct = 3
     required_no_change_cases_correct = 2
+    required_context_cases_correct = 1
     minimum_structural_validation_rate = 0.75
 
     majority_case_gate = (
@@ -636,6 +655,10 @@ def summarize_benchmark_gate(
     no_change_case_gate = (
         no_change_cases_correct
         >= required_no_change_cases_correct
+    )
+    context_case_gate = (
+        context_cases_correct
+        >= required_context_cases_correct
     )
     high_confidence_false_positive_gate = (
         high_confidence_false_positive_count == 0
@@ -664,6 +687,12 @@ def summarize_benchmark_gate(
             required_no_change_cases_correct
         ),
         "no_change_case_gate": no_change_case_gate,
+        "context_cases": len(context_case_summaries),
+        "context_cases_correct": context_cases_correct,
+        "required_context_cases_correct": (
+            required_context_cases_correct
+        ),
+        "context_case_gate": context_case_gate,
         "high_confidence_false_positive_count": (
             high_confidence_false_positive_count
         ),
@@ -686,6 +715,7 @@ def summarize_benchmark_gate(
                 majority_case_gate,
                 change_case_gate,
                 no_change_case_gate,
+                context_case_gate,
                 high_confidence_false_positive_gate,
                 structural_validation_gate,
             )
