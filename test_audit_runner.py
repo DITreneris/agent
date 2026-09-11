@@ -300,3 +300,33 @@ Section 6 value: GO, GO_WITH_NOTES, or BLOCK.
 Section 7 value: High, Medium, or Low."""
 
     assert REPAIR_PROMPT.rstrip().endswith(expected_ending)
+
+
+def test_retry_survives_braces_in_invalid_contract_value():
+    first_response = VALID_RESPONSE.replace(
+        "Classification: FALSE_POSITIVE_CANDIDATE",
+        "Classification: {foo}",
+    )
+    responses = iter(
+        [
+            first_response,
+            VALID_RESPONSE,
+        ]
+    )
+    prompts = []
+
+    def model_call(prompt: str) -> str:
+        prompts.append(prompt)
+        return next(responses)
+
+    result = run_validated_audit(
+        initial_prompt="Audit this {code} sample.",
+        model_call=model_call,
+    )
+
+    assert result.success is True
+    assert result.retry_used is True
+    assert len(prompts) == 2
+    assert "{foo}" in prompts[1]
+    assert "Audit this {code} sample." in prompts[1]
+    assert result.retry_prompt == prompts[1]

@@ -68,6 +68,19 @@ class ValidatedAuditResult:
     retry_prompt: str | None = None
 
 
+def _fill_repair_prompt(
+    initial_prompt: str,
+    validation_errors: str,
+) -> str:
+    return REPAIR_PROMPT.replace(
+        "{initial_prompt}",
+        initial_prompt,
+    ).replace(
+        "{validation_errors}",
+        validation_errors,
+    )
+
+
 def run_validated_audit(
     initial_prompt: str,
     model_call: Callable[[str], str],
@@ -98,7 +111,7 @@ def run_validated_audit(
         for error in first_validation.errors
     )
 
-    repair_prompt = REPAIR_PROMPT.format(
+    repair_prompt = _fill_repair_prompt(
         initial_prompt=initial_prompt,
         validation_errors=validation_errors,
     )

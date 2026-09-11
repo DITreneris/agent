@@ -26,8 +26,9 @@ The benchmark contains eight cases:
 - Temperature: 0.1
 - Context size: 8192
 - Seeds: 11, 22, 33
-- Existing prompt, validator, retry logic, and seven-section output contract
-  remain unchanged.
+- Validator, retry logic, and seven-section output contract remain frozen
+- The focused audit prompt last-shot (evidence boundary) is complete and failed
+- The reviewer program is closed; this corpus remains a measurement lock
 
 ## Quality Gate
 

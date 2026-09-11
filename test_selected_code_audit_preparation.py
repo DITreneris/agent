@@ -150,3 +150,24 @@ def test_prepare_selected_code_audit_accepts_typescript_range(
     assert "colleague's" in prepared.selected_content
     assert prepared.context_content == ""
     assert prepared.context_names == set()
+
+
+def test_prepare_selected_code_audit_rejects_sibling_prefix_path(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "proj"
+    project.mkdir()
+    (project / "inside.py").write_text("x = 1\n", encoding="utf-8")
+
+    sibling = tmp_path / "proj_backup"
+    sibling.mkdir()
+    outside = sibling / "outside.py"
+    outside.write_text("print('outside')\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Access denied"):
+        prepare_selected_code_audit(
+            project_root=project,
+            file_name=str(outside),
+            start_line=1,
+            end_line=1,
+        )

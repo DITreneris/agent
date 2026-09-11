@@ -700,3 +700,243 @@ def test_invalid_contract_value_is_rejected(
     result = validate_audit_output(response)
 
     assert result.valid is False
+
+
+def test_bulleted_valid_response_is_accepted():
+    response = """
+1. Bottom line
+The function is operational.
+
+2. Direct critique
+- Classification: FALSE_POSITIVE_CANDIDATE
+- Evidence: EVIDENCE_HIGH
+- Why: No blocking defect is visible in the provided code.
+- Missing context: none
+
+3. Better option
+Keep the current implementation.
+
+4. Next steps
+- Recommended action: NO_CHANGE
+- Test status: NO_TEST_NEEDED
+- Reason: No change is justified because no visible defect is present.
+
+5. Top 3 pitfalls
+1. Model false positives.
+2. Format drift.
+3. Missing evidence.
+
+6. Verdict
+GO
+
+7. Confidence
+High.
+""".strip()
+
+    result = validate_audit_output(response)
+
+    assert result.valid is True
+    assert result.errors == []
+
+
+def test_bulleted_invalid_contract_values_are_rejected():
+    response = """
+1. Bottom line
+The function is operational.
+
+2. Direct critique
+- Classification: BANANA
+- Evidence: EVIDENCE_HIGH
+- Why: No blocking defect is visible in the provided code.
+- Missing context: none
+
+3. Better option
+Keep the current implementation.
+
+4. Next steps
+- Recommended action: SHIP_IT
+- Test status: NO_TEST_NEEDED
+- Reason: No change is justified because no visible defect is present.
+
+5. Top 3 pitfalls
+1. Model false positives.
+2. Format drift.
+3. Missing evidence.
+
+6. Verdict
+GO
+
+7. Confidence
+High.
+""".strip()
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "Invalid Classification value in 2. Direct critique: 'BANANA'."
+        in result.errors
+    )
+    assert (
+        "Invalid Recommended action value in 4. Next steps: 'SHIP_IT'."
+        in result.errors
+    )
+
+
+def test_block_requires_real_bug_and_high_evidence_on_same_finding():
+    response = """
+1. Bottom line
+A mixed audit.
+
+2. Direct critique
+Classification: REAL_BUG
+Evidence: EVIDENCE_LOW
+Why: A theoretical crash path is described.
+Missing context: none
+
+Classification: FALSE_POSITIVE_CANDIDATE
+Evidence: EVIDENCE_HIGH
+Why: The second concern is already protected.
+Missing context: none
+
+3. Better option
+Fix the first concern.
+
+4. Next steps
+Recommended action: FIX_NOW
+Test status: ADD_TEST_CONFIRMED
+Reason: The audit recommends a code change.
+
+5. Top 3 pitfalls
+A theoretical crash may remain.
+
+6. Verdict
+BLOCK
+
+7. Confidence
+Medium
+""".strip()
+
+    result = validate_audit_output(response)
+
+    assert result.valid is False
+    assert (
+        "BLOCK verdict requires at least one REAL_BUG finding with EVIDENCE_HIGH."
+        in result.errors
+    )
+
+
+def test_block_accepts_paired_real_bug_high_with_separate_low_finding():
+    response = """
+1. Bottom line
+A proven crash is visible.
+
+2. Direct critique
+Classification: REAL_BUG
+Evidence: EVIDENCE_HIGH
+Why: None reaches strip and raises AttributeError.
+Missing context: none
+
+Classification: FALSE_POSITIVE_CANDIDATE
+Evidence: EVIDENCE_LOW
+Why: A separate stylistic concern is not a defect.
+Missing context: none
+
+3. Better option
+Guard None before calling strip.
+
+4. Next steps
+Recommended action: FIX_NOW
+Test status: ADD_TEST_CONFIRMED
+Reason: The visible execution path can fail.
+
+5. Top 3 pitfalls
+The runtime failure blocks the workflow.
+
+6. Verdict
+BLOCK
+
+7. Confidence
+Medium
+""".strip()
+
+    result = validate_audit_output(response)
+
+    assert result.valid is True
+    assert result.errors == []
+
+
+def test_mixed_high_and_low_findings_can_recommend_fix_now():
+    response = """
+1. Bottom line
+A proven crash is visible.
+
+2. Direct critique
+Classification: REAL_BUG
+Evidence: EVIDENCE_HIGH
+Why: None reaches strip and raises AttributeError.
+Missing context: none
+
+Classification: PLAUSIBLE_RISK
+Evidence: EVIDENCE_LOW
+Why: A theoretical extra concern is not proven.
+Missing context: none
+
+3. Better option
+Guard None before calling strip.
+
+4. Next steps
+Recommended action: FIX_NOW
+Test status: ADD_TEST_CONFIRMED
+Reason: The visible execution path can fail.
+
+5. Top 3 pitfalls
+The runtime failure blocks the workflow.
+
+6. Verdict
+GO_WITH_NOTES
+
+7. Confidence
+Medium
+""".strip()
+
+    result = validate_audit_output(response)
+
+    assert result.valid is True
+    assert (
+        "EVIDENCE_LOW findings cannot recommend code changes."
+        not in result.errors
+    )
+
+
+def test_verdict_trailing_period_is_accepted():
+    response = VALID_RESPONSE.replace(
+        "6. Verdict\nGO",
+        "6. Verdict\nGO.",
+    )
+
+    result = validate_audit_output(response)
+
+    assert result.valid is True
+    assert result.errors == []
+
+
+def test_short_helper_name_does_not_match_inside_words():
+    response = VALID_RESPONSE.replace(
+        "Why: No blocking defect is visible in the provided code.",
+        "Why: The valid code path is visible.",
+    ).replace(
+        "Missing context: none",
+        "Missing context: The definition of the caller schema.",
+    )
+
+    result = validate_audit_output(
+        response,
+        available_context_names={"id"},
+    )
+
+    assert result.valid is True
+    assert (
+        "Available helper context cannot be reported as missing: id."
+        not in result.errors
+    )

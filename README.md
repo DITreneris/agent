@@ -7,37 +7,39 @@ unsupported findings from a local LLM.
 This is an internal development experiment, not a product and not an
 authoritative code-review system.
 
-> **Experimental status:** the implementation passes its recorded local test
-> suite, but audit judgment is not yet reliable enough for autonomous or
-> authoritative code review.
+> **Experimental status:** the reviewer program is closed. Local tests
+> pass, and the measurement tooling remains, but audit judgment is not
+> reliable enough for autonomous or authoritative code review.
 
 ## Current State
 
 | Measure | Current evidence |
 |---|---|
-| Development state | Unreleased work after `v1.13.3` |
-| Latest recorded local tests | `172 passed, 1 external dependency warning` |
-| Decision benchmark v2 | 8 cases × 3 seeds; 24 runs |
-| Correct majority decisions | `6 of 8`; overall gate failed |
+| Development state | Reviewer program closed after last-shot FAIL |
+| Latest recorded local tests | `194 passed, 1 warning` |
+| Decision benchmark | Evidence-boundary last-shot; 8 cases × 3 seeds; 24 runs |
+| Correct majority decisions | `5 of 8`; overall gate failed |
 | Structural validity | `24 of 24` |
 | Proven defects | `3 of 3` cases; `9 of 9` runs received CHANGE |
-| Safe targets | `3 of 3` correct by majority |
+| Safe targets | `2 of 3` correct by majority |
 | Context-required targets | `0 of 2` by majority; `0 of 6` runs used INSPECT_CONTEXT |
-| High-confidence false positives | `1` |
+| High-confidence false positives | `2` |
 | Historical real-repository pilot | `0 of 5` audits rated useful or partially useful |
 | Consecutive field sample at `4096` | `0 of 8` useful or partially useful; `6 of 8` structurally rejected |
 | Context-window A/B | `4096`: `0 of 9` accepted; `8192`: `8 of 9` accepted |
 | Field rerun at `8192` | `6 of 8` accepted; `1 of 8` partially useful; `0 of 8` useful |
-| Current development target | Improve the evidence boundary without weakening defect recall |
+| Current development target | None; reviewer program closed |
 
-The contract-grounded decision benchmark v2 produced structurally valid
-outputs in all 24 runs and correct majority decisions in six of eight cases.
-The benchmark still failed because neither context-required target received
-`INSPECT_CONTEXT`, and one safe run produced a high-confidence false positive.
+The evidence-boundary last-shot produced structurally valid outputs in all
+24 live runs and failed the reviewer gate. Correct majority decisions fell
+to five of eight. Context recall stayed at zero. Case 003 majority flipped
+to `CHANGE`, with two high-confidence false positives. Defect recall stayed
+`9 of 9`.
 
-The remaining bottleneck is reviewer judgment: the model treats a reachable
-exception as a confirmed defect when the visible code does not establish the
-relevant caller, schema, type, or error contract.
+The locked one-variable prompt change did not make `gemma4:e4b` use
+`INSPECT_CONTEXT` when the caller or schema is not visible. The reviewer
+program is closed. The repository remains as a negative result and as
+measurement tooling. A field sample was not run.
 
 The first consecutive eight-audit field sample at the default `4096`
 context produced six structurally rejected outputs and no useful or partially
@@ -56,9 +58,9 @@ most structural failures but did not make reviewer judgment reliable.
 The historical production-repository pilot has not been rerun. The current
 eight-case field sample used this repository's development code.
 
-## What We Are Testing
+## What Was Tested
 
-The project tests whether a small local audit system can:
+The closed reviewer program tested whether a small local audit system can:
 
 1. inspect a focused code range, function, or direct class method;
 2. include directly called top-level helpers from the same Python file;
@@ -68,8 +70,9 @@ The project tests whether a small local audit system can:
 6. preserve both attempts and validation errors;
 7. compare model output against fixed cases and human review.
 
-The core research problem is not output formatting. It is reviewer judgment:
-distinguishing a real defect from correct or intentional code.
+The core research problem was reviewer judgment: distinguishing a real defect
+from correct or intentional code. Structural validity was solved. Judgment
+was not. The locked last-shot did not change that.
 
 ## Run
 
@@ -167,6 +170,49 @@ python evaluation_runner.py \
   --output /tmp/decision-grade-benchmark.json
 ```
 
+Re-score a captured report without calling Ollama:
+
+```bash
+python evaluation_runner.py \
+  --replay-json evaluation_results/decision_grade_benchmark_v2_baseline.json \
+  --output /tmp/decision-grade-replay.json
+```
+
+`--replay-json` cannot be combined with `--seeds`.
+
+### Evidence-Boundary Last-Shot
+
+| Gate | Result |
+|---|---:|
+| At least 6/8 correct majority decisions | FAIL — `5/8` |
+| All 3 proven defects majority CHANGE | PASS — `3/3` |
+| At least 2/3 safe cases majority NO_CHANGE | PASS — `2/3` |
+| At least 1/2 context cases majority INSPECT_CONTEXT | FAIL — `0/2` |
+| Zero high-confidence false positives | FAIL — `2` |
+| At least 75% structurally valid outputs | PASS — `100%` |
+
+The overall benchmark gate failed. Context recall stayed at zero. Case 003
+majority flipped to `CHANGE`. This last-shot closed the reviewer program.
+
+### Post-Hardening Re-baseline
+
+| Gate | Result |
+|---|---:|
+| At least 6/8 correct majority decisions | PASS — `6/8` |
+| All 3 proven defects majority CHANGE | PASS — `3/3` |
+| At least 2/3 safe cases majority NO_CHANGE | PASS — `3/3` |
+| At least 1/2 context cases majority INSPECT_CONTEXT | FAIL — `0/2` |
+| Zero high-confidence false positives | PASS — `0` |
+| At least 75% structurally valid outputs | PASS — `100%` |
+
+The overall benchmark gate failed. A `6/8` majority score is not sufficient
+when context recall remains zero. The live HCFP count of `0` is not a
+hardening win; replay of the v2 texts still has one HCFP.
+
+Case 003 passed `3 of 3`, but every run required structural retry. Cases 007
+and 008 received `FIX_NOW`, `BLOCK`, and High confidence in every seed
+instead of requesting caller or schema context.
+
 ### Contract-Grounded v2 Baseline
 
 | Gate | Result |
@@ -204,6 +250,8 @@ output was not established.
 - Structural validity does not guarantee useful engineering judgment.
 - Offline replay checks validator behavior against captured attempts; it does
   not reproduce nondeterministic model generation.
+- Evaluation `--replay-json` re-scores captured benchmark reports against the
+  current validator and expected fixtures; it does not call Ollama.
 - A local model can restate speculative findings in wording not covered by
   validator rules.
 
@@ -211,7 +259,9 @@ output was not established.
 
 Keep:
 
+- the repository as a negative result and measurement tool;
 - the multi-seed benchmark CLI;
+- offline `--replay-json` re-scoring of captured evaluation reports;
 - configurable context size and Ollama attempt diagnostics;
 - per-case stability summaries;
 - raw response and retry diagnostics;
@@ -227,19 +277,13 @@ Reject:
 - treating structural acceptance as proof of real-repository usefulness;
 - an immediate typed-output renderer before judgment improves.
 
-Next validation gate:
+Closed:
 
-1. keep the contract-grounded eight-case corpus, `gemma4:e4b`, `8192`
-   context, temperature `0.1`, and seeds `11`, `22`, and `33`;
-2. change one variable only: the evidence boundary in the focused audit
-   prompt;
-3. preserve all three defect majorities and at least two safe-case
-   majorities;
-4. require at least one of two context cases to receive
-   `INSPECT_CONTEXT` by majority;
-5. require zero high-confidence false positives and at least 75% structural
-   validity;
-6. run a real-repository field sample only after the synthetic gate passes.
+- the reviewer program, after the evidence-boundary last-shot failed
+  with `0 of 6` `INSPECT_CONTEXT` runs;
+- further prompt, validator, or model experiments unless a new written
+  hypothesis exists;
+- a real-repository field sample.
 
 ## Explicit Non-Goals
 
@@ -265,6 +309,11 @@ Do not add unless repeated real usage proves the need:
 - [Reverted validator experiment](evaluation_results/gemma4_e4b_t01_seeds_11_22_33_compact_retry_state_validator.json)
 - [Contract-grounded benchmark v2 report](evaluation_results/decision_grade_benchmark_v2_baseline.md)
 - [Contract-grounded benchmark v2 evidence](evaluation_results/decision_grade_benchmark_v2_baseline.json)
+- [Post-hardening re-baseline report](evaluation_results/decision_grade_benchmark_v2_post_hardening.md)
+- [Post-hardening re-baseline evidence](evaluation_results/decision_grade_benchmark_v2_post_hardening.json)
+- [Post-hardening replay of v2 texts](evaluation_results/decision_grade_benchmark_v2_post_hardening_replay.json)
+- [Evidence-boundary last-shot report](evaluation_results/decision_grade_benchmark_v2_evidence_boundary.md)
+- [Evidence-boundary last-shot evidence](evaluation_results/decision_grade_benchmark_v2_evidence_boundary.json)
 
 ## License
 

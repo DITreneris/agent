@@ -1,12 +1,17 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from audit_runner import ValidatedAuditResult
 
 from evaluation_runner import (
     load_evaluation_cases,
     parse_cli_args,
     prepare_evaluation_case,
+    reconstruct_replay_result,
+    replay_captured_case,
+    replay_evaluation_report,
     run_cli,
     score_evaluation_result,
     summarize_case_stability,
@@ -17,6 +22,8 @@ from evaluation_runner import (
     summarize_decision_scores,
     summarize_benchmark_gate,
 )
+
+from test_audit_validator import VALID_RESPONSE
 
 
 def test_parse_cli_args_accepts_multi_seed_config(
@@ -46,9 +53,24 @@ def test_parse_cli_args_accepts_multi_seed_config(
     assert args.output == output_path
 
 
+def test_parse_cli_args_defaults_num_ctx_to_8192(
+    tmp_path: Path,
+) -> None:
+    args = parse_cli_args(
+        [
+            "--output",
+            str(tmp_path / "result.json"),
+        ]
+    )
+
+    assert args.num_ctx == 8192
+    assert args.seeds is None
+
+
 def test_run_cli_writes_multi_seed_json_without_real_model(
     tmp_path: Path,
     monkeypatch,
+    capsys,
 ) -> None:
     captured = {
         "configs": [],
@@ -110,6 +132,8 @@ def test_run_cli_writes_multi_seed_json_without_real_model(
     )
 
     assert exit_code == 0
+    printed = capsys.readouterr()
+    assert "Benchmark gate: FAIL" in printed.out
     assert [
         config.seed
         for config in captured["configs"]
@@ -263,6 +287,7 @@ def test_load_real_evaluation_cases() -> None:
 
     assert cases[0]["expected_verdicts"] == ["GO"]
     assert cases[1]["expected_verdicts"] == ["GO_WITH_NOTES", "BLOCK"]
+    assert cases[1]["required_keyword_groups"][0] == ["name"]
     assert cases[2]["expected_verdicts"] == ["GO"]
 
     assert [
@@ -1442,3 +1467,288 @@ def test_summarize_decision_scores_separates_context_metrics() -> None:
     assert summary["inspect_context_precision"] == 0.5
     assert "abstention_total" not in summary
     assert "abstention_accuracy" not in summary
+
+
+BLOCK_SPLIT_FINDINGS_RESPONSE = """
+1. Bottom line
+A mixed audit.
+
+2. Direct critique
+Classification: REAL_BUG
+Evidence: EVIDENCE_LOW
+Why: A theoretical crash path is described.
+Missing context: none
+
+Classification: FALSE_POSITIVE_CANDIDATE
+Evidence: EVIDENCE_HIGH
+Why: The second concern is already protected.
+Missing context: none
+
+3. Better option
+Fix the first concern.
+
+4. Next steps
+Recommended action: FIX_NOW
+Test status: ADD_TEST_CONFIRMED
+Reason: The audit recommends a code change.
+
+5. Top 3 pitfalls
+A theoretical crash may remain.
+
+6. Verdict
+BLOCK
+
+7. Confidence
+Medium
+""".strip()
+
+INVALID_FIRST_RESPONSE = "not a valid audit"
+
+
+def test_parse_cli_args_accepts_replay_json(
+    tmp_path: Path,
+) -> None:
+    args = parse_cli_args(
+        [
+            "--replay-json",
+            str(tmp_path / "source.json"),
+            "--output",
+            str(tmp_path / "replay.json"),
+        ]
+    )
+
+    assert args.replay_json == tmp_path / "source.json"
+    assert args.seeds is None
+    assert args.output == tmp_path / "replay.json"
+
+
+def test_parse_cli_args_rejects_replay_json_with_seeds(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(SystemExit) as exc:
+        parse_cli_args(
+            [
+                "--replay-json",
+                str(tmp_path / "source.json"),
+                "--seeds",
+                "11",
+                "--output",
+                str(tmp_path / "replay.json"),
+            ]
+        )
+
+    assert exc.value.code == 2
+
+
+def test_reconstruct_replay_accepts_valid_first_response() -> None:
+    reconstruction = reconstruct_replay_result(
+        {
+            "first_response": VALID_RESPONSE,
+            "retry_response": None,
+        }
+    )
+
+    assert reconstruction.first_now_valid is True
+    assert reconstruction.retry_now_valid is None
+    assert reconstruction.needs_live_retry is False
+    assert reconstruction.result.success is True
+    assert reconstruction.result.retry_used is False
+    assert reconstruction.result.response == VALID_RESPONSE
+
+
+def test_reconstruct_replay_rejects_block_on_split_findings() -> None:
+    reconstruction = reconstruct_replay_result(
+        {
+            "first_response": BLOCK_SPLIT_FINDINGS_RESPONSE,
+            "retry_response": None,
+        }
+    )
+
+    assert reconstruction.first_now_valid is False
+    assert reconstruction.needs_live_retry is True
+    assert reconstruction.result.success is False
+    assert reconstruction.result.retry_used is False
+    assert (
+        "BLOCK verdict requires at least one REAL_BUG finding "
+        "with EVIDENCE_HIGH."
+        in reconstruction.result.errors
+    )
+
+
+def test_reconstruct_replay_uses_captured_retry() -> None:
+    reconstruction = reconstruct_replay_result(
+        {
+            "first_response": INVALID_FIRST_RESPONSE,
+            "retry_response": VALID_RESPONSE,
+        }
+    )
+
+    assert reconstruction.first_now_valid is False
+    assert reconstruction.retry_now_valid is True
+    assert reconstruction.needs_live_retry is False
+    assert reconstruction.result.success is True
+    assert reconstruction.result.retry_used is True
+    assert reconstruction.result.response == VALID_RESPONSE
+    assert reconstruction.result.first_response == INVALID_FIRST_RESPONSE
+
+
+def test_reconstruct_replay_sets_needs_live_retry_without_captured_retry() -> None:
+    reconstruction = reconstruct_replay_result(
+        {
+            "first_response": INVALID_FIRST_RESPONSE,
+            "retry_response": None,
+        }
+    )
+
+    assert reconstruction.first_now_valid is False
+    assert reconstruction.retry_now_valid is None
+    assert reconstruction.needs_live_retry is True
+    assert reconstruction.result.success is False
+    assert reconstruction.result.retry_used is False
+
+
+def test_replay_captured_case_scores_current_expected_json() -> None:
+    case = load_evaluation_cases(Path("evaluation_cases"))[0]
+    captured = {
+        "case_id": case["id"],
+        "audit_valid": True,
+        "passed": True,
+        "retry_used": False,
+        "first_response": VALID_RESPONSE,
+        "retry_response": None,
+        "run_index": 1,
+        "seed": 11,
+    }
+
+    score = replay_captured_case(case, captured)
+
+    assert score["audit_valid"] is True
+    assert score["needs_live_retry"] is False
+    assert score["first_now_valid"] is True
+    assert score["audit_valid_changed"] is False
+    assert score["case_id"] == "case_001_correct_helper_contract"
+    assert score["seed"] == 11
+
+
+def test_replay_captured_case_flags_block_split_findings_drift() -> None:
+    case = load_evaluation_cases(Path("evaluation_cases"))[0]
+    captured = {
+        "case_id": case["id"],
+        "audit_valid": True,
+        "passed": True,
+        "retry_used": False,
+        "first_response": BLOCK_SPLIT_FINDINGS_RESPONSE,
+        "retry_response": None,
+    }
+
+    score = replay_captured_case(case, captured)
+
+    assert score["audit_valid"] is False
+    assert score["needs_live_retry"] is True
+    assert score["audit_valid_changed"] is True
+    assert score["passed_changed"] is True
+
+
+def _write_captured_report(
+    path: Path,
+    case_id: str,
+    first_response: str,
+    retry_response: str | None = None,
+) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "metadata": {
+                    "model": "gemma4:e4b",
+                    "temperature": 0.1,
+                    "num_ctx": 8192,
+                    "seeds": [11],
+                    "run_count": 1,
+                },
+                "runs": [
+                    {
+                        "run_index": 1,
+                        "seed": 11,
+                        "case_results": [
+                            {
+                                "case_id": case_id,
+                                "audit_valid": True,
+                                "passed": True,
+                                "retry_used": retry_response is not None,
+                                "first_response": first_response,
+                                "retry_response": retry_response,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_replay_evaluation_report_records_mode_and_drift(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "source.json"
+    case = load_evaluation_cases(Path("evaluation_cases"))[0]
+    _write_captured_report(
+        source_path,
+        case["id"],
+        VALID_RESPONSE,
+    )
+
+    report = replay_evaluation_report(source_path)
+
+    assert report["metadata"]["mode"] == "replay"
+    assert report["metadata"]["model_called"] is False
+    assert report["metadata"]["source_path"] == str(source_path)
+    assert report["metadata"]["model"] == "gemma4:e4b"
+    assert report["replay_drift"]["total_rows"] == 1
+    assert report["replay_drift"]["needs_live_retry"] == 0
+    assert report["summary"]["total"] == 1
+
+
+def test_run_cli_replay_json_does_not_construct_ollama_config(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    def boom(*args, **kwargs):
+        raise AssertionError(
+            "OllamaAuditConfig should not be constructed during replay."
+        )
+
+    monkeypatch.setattr(
+        "evaluation_runner.OllamaAuditConfig",
+        boom,
+    )
+
+    source_path = tmp_path / "source.json"
+    output_path = tmp_path / "replay.json"
+    case = load_evaluation_cases(Path("evaluation_cases"))[0]
+    _write_captured_report(
+        source_path,
+        case["id"],
+        VALID_RESPONSE,
+    )
+
+    exit_code = run_cli(
+        [
+            "--replay-json",
+            str(source_path),
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    report = json.loads(
+        output_path.read_text(encoding="utf-8")
+    )
+    printed = capsys.readouterr()
+
+    assert exit_code == 0
+    assert report["metadata"]["mode"] == "replay"
+    assert report["metadata"]["model_called"] is False
+    assert "Replay drift:" in printed.out
+    assert "Results written to:" in printed.out

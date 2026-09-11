@@ -21,8 +21,7 @@
   "forbidden_claims": [],
   "required_keyword_groups": [
     [
-      "name",
-      "missing"
+      "name"
     ],
     [
       "none",

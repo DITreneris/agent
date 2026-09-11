@@ -54,8 +54,10 @@ Priority rules:
 - after Smart Context Injection, the next priority is file-aware project audit
 - prefer workflow improvements over internal optimization
 - prefer one concrete next command or capability over broad architecture advice
-- the recommended next capability should be: /audit_file <path>
-- /audit_file should inspect one explicit file and return code-level critique
+- the recommended next capability should be a focused audit:
+  /audit_lines <path> <start> <end>, /audit_function <path> <function_name>,
+  or /audit_method <path> <ClassName.method_name>
+- /audit_file is legacy; do not recommend it as the next capability
 - do not say that no audit exists if /audit already exists; say that current audit is summary-level, not file-level
 - when suggesting /inspect or /read_file, use relative paths such as /inspect agent.py, not absolute paths
 - prefer auditing chat_agent.py first when the next task concerns command routing or agent behavior
@@ -112,7 +114,16 @@ Finding discipline:
   - EVIDENCE_LOW: theoretical concern only.
 - Do not present PLAUSIBLE_RISK, EVIDENCE_LOW, or NEEDS_CONTEXT findings as confirmed defects.
 - If imported constants or helpers are not visible, do not recommend refactoring them or adding tests against impossible shapes such as null/undefined unless the visible code shows they can actually be null/undefined. Prefer INSPECT_CONTEXT.
-- Do not use BLOCK for future fragility, style preference, generic global-state concerns, generic async concerns, missing tests alone, or uninspected imported constants.
+- Do not use BLOCK for future fragility, style preference, generic global-state concerns, generic async concerns, missing tests alone, uninspected imported constants, or a reachable exception that has no visible contract forbidding it.
+
+Evidence boundary:
+- Distinguish an observable exception path from a visible contract violation.
+- A visible contract is a type hint, docstring, or named guarantee in the selected code or provided same-file context.
+- If that contract is contradicted by the execution path, classify REAL_BUG, recommend FIX_NOW, and treat it as a confirmed defect even when the failure is an exception.
+- A reachable ValueError, KeyError, AttributeError, conversion failure, or similar raise is not a confirmed defect unless that visible contract says the input is in-scope and must not raise.
+- Do not treat "this can raise if the caller passes X" as proof that the caller will pass X, or that passing X is a defect.
+- If the selected function is a thin conversion, parse, or lookup and the caller, schema, or error-handling policy is not in the selected code or provided context, classify NEEDS_CONTEXT, recommend INSPECT_CONTEXT, use Medium or Low confidence, name the missing caller or schema, and do not use BLOCK or FIX_NOW.
+- Do not recommend INSPECT_CONTEXT when a visible contract is already violated by the selected path.
 - Before recommending tests, state the test status as one of:
   - ADD_TEST_CONFIRMED
   - POSSIBLE_TEST_GAP
@@ -197,7 +208,7 @@ Return exactly one of:
 Verdict guidance:
 - GO: use only when no code change is justified and no meaningful practical risk is visible.
 - GO_WITH_NOTES: use when the code can proceed, but there are assumptions, edge cases, maintainability risks, test gaps, or non-blocking issues worth tracking.
-- BLOCK: use only when the visible code contains a directly provable current runtime crash, security/data-loss bug, test-breaking defect, or workflow-blocking boundary violation. Do not use BLOCK for future fragility, style preference, missing tests alone, generic global-state concerns, generic async concerns, or uninspected imported constants.
+- BLOCK: use only when the visible code contains a directly provable current runtime crash, security/data-loss bug, test-breaking defect, or workflow-blocking boundary violation that violates a visible type, docstring, or named contract. Do not use BLOCK for future fragility, style preference, missing tests alone, generic global-state concerns, generic async concerns, uninspected imported constants, or a reachable exception whose allowed inputs and error policy are not established in the visible code.
 
 
 7. Confidence
@@ -205,8 +216,8 @@ Return exactly one of:
 High
 Medium
 Low
-Use High only when the finding is directly provable from visible code.
-Use Medium or Low when the finding depends on missing imports, callers, runtime state, or test context.
+Use High only when the finding is directly provable from visible code and, for a crash or exception, that visible code also establishes a contract the path violates.
+Use Medium or Low when the finding depends on missing imports, callers, schema, error-handling policy, runtime state, or test context.
 
 Output rules:
 -- Start exactly with: 1. Bottom line

@@ -1,0 +1,584 @@
+{
+  "metadata": {
+    "model": "gemma4:e4b",
+    "temperature": 0.1,
+    "num_ctx": 8192,
+    "seeds": [
+      11
+    ],
+    "run_count": 1
+  },
+  "summary": {
+    "total": 8,
+    "passed": 4,
+    "failed": 4,
+    "pass_rate": 0.5
+  },
+  "decision_summary": {
+    "total_scored": 8,
+    "correct_decisions": 5,
+    "incorrect_decisions": 3,
+    "decision_accuracy": 0.625,
+    "false_positive_count": 1,
+    "false_negative_count": 0,
+    "high_confidence_false_positive_count": 1,
+    "context_required_runs": 2,
+    "actual_inspect_context_runs": 0,
+    "correct_inspect_context_runs": 0,
+    "inspect_context_recall": 0.0,
+    "inspect_context_precision": 0.0
+  },
+  "benchmark_gate": {
+    "total_cases": 8,
+    "majority_correct_cases": 5,
+    "minimum_majority_correct_cases": 6,
+    "majority_case_gate": false,
+    "change_cases": 3,
+    "change_cases_correct": 0,
+    "required_change_cases_correct": 3,
+    "change_case_gate": false,
+    "no_change_cases": 3,
+    "no_change_cases_correct": 0,
+    "required_no_change_cases_correct": 2,
+    "no_change_case_gate": false,
+    "context_cases": 2,
+    "context_cases_correct": 0,
+    "required_context_cases_correct": 1,
+    "context_case_gate": false,
+    "high_confidence_false_positive_count": 1,
+    "high_confidence_false_positive_gate": false,
+    "total_runs": 8,
+    "structurally_valid_runs": 8,
+    "structural_validation_rate": 1.0,
+    "minimum_structural_validation_rate": 0.75,
+    "structural_validation_gate": true,
+    "passed": false
+  },
+  "case_stability": [
+    {
+      "case_id": "case_001_correct_helper_contract",
+      "total_runs": 1,
+      "passed_runs": 1,
+      "failed_runs": 0,
+      "pass_rate": 1.0,
+      "stable_pass_outcome": false,
+      "verdict_counts": {
+        "GO": 1
+      },
+      "stable_verdict": false,
+      "retry_runs": 0,
+      "retry_rate": 0.0,
+      "expected_decision": "NO_CHANGE",
+      "decision_counts": {
+        "NO_CHANGE": 1
+      },
+      "majority_decision": "NO_CHANGE",
+      "majority_count": 1,
+      "majority_decision_correct": true,
+      "correct_decision_runs": 1,
+      "decision_accuracy": 1.0,
+      "stable_decision": false,
+      "high_confidence_false_positive_runs": 0
+    },
+    {
+      "case_id": "case_002_real_none_bug",
+      "total_runs": 1,
+      "passed_runs": 1,
+      "failed_runs": 0,
+      "pass_rate": 1.0,
+      "stable_pass_outcome": false,
+      "verdict_counts": {
+        "BLOCK": 1
+      },
+      "stable_verdict": false,
+      "retry_runs": 0,
+      "retry_rate": 0.0,
+      "expected_decision": "CHANGE",
+      "decision_counts": {
+        "CHANGE": 1
+      },
+      "majority_decision": "CHANGE",
+      "majority_count": 1,
+      "majority_decision_correct": true,
+      "correct_decision_runs": 1,
+      "decision_accuracy": 1.0,
+      "stable_decision": false,
+      "high_confidence_false_positive_runs": 0
+    },
+    {
+      "case_id": "case_003_intentional_none_contract",
+      "total_runs": 1,
+      "passed_runs": 0,
+      "failed_runs": 1,
+      "pass_rate": 0.0,
+      "stable_pass_outcome": false,
+      "verdict_counts": {
+        "GO_WITH_NOTES": 1
+      },
+      "stable_verdict": false,
+      "retry_runs": 0,
+      "retry_rate": 0.0,
+      "expected_decision": "NO_CHANGE",
+      "decision_counts": {
+        "CHANGE": 1
+      },
+      "majority_decision": "CHANGE",
+      "majority_count": 1,
+      "majority_decision_correct": false,
+      "correct_decision_runs": 0,
+      "decision_accuracy": 0.0,
+      "stable_decision": false,
+      "high_confidence_false_positive_runs": 1
+    },
+    {
+      "case_id": "case_004_empty_average_bug",
+      "total_runs": 1,
+      "passed_runs": 1,
+      "failed_runs": 0,
+      "pass_rate": 1.0,
+      "stable_pass_outcome": false,
+      "verdict_counts": {
+        "BLOCK": 1
+      },
+      "stable_verdict": false,
+      "retry_runs": 0,
+      "retry_rate": 0.0,
+      "expected_decision": "CHANGE",
+      "decision_counts": {
+        "CHANGE": 1
+      },
+      "majority_decision": "CHANGE",
+      "majority_count": 1,
+      "majority_decision_correct": true,
+      "correct_decision_runs": 1,
+      "decision_accuracy": 1.0,
+      "stable_decision": false,
+      "high_confidence_false_positive_runs": 0
+    },
+    {
+      "case_id": "case_005_partial_transfer_mutation",
+      "total_runs": 1,
+      "passed_runs": 0,
+      "failed_runs": 1,
+      "pass_rate": 0.0,
+      "stable_pass_outcome": false,
+      "verdict_counts": {
+        "BLOCK": 1
+      },
+      "stable_verdict": false,
+      "retry_runs": 0,
+      "retry_rate": 0.0,
+      "expected_decision": "CHANGE",
+      "decision_counts": {
+        "CHANGE": 1
+      },
+      "majority_decision": "CHANGE",
+      "majority_count": 1,
+      "majority_decision_correct": true,
+      "correct_decision_runs": 1,
+      "decision_accuracy": 1.0,
+      "stable_decision": false,
+      "high_confidence_false_positive_runs": 0
+    },
+    {
+      "case_id": "case_006_idempotent_cleanup",
+      "total_runs": 1,
+      "passed_runs": 1,
+      "failed_runs": 0,
+      "pass_rate": 1.0,
+      "stable_pass_outcome": false,
+      "verdict_counts": {
+        "GO": 1
+      },
+      "stable_verdict": false,
+      "retry_runs": 0,
+      "retry_rate": 0.0,
+      "expected_decision": "NO_CHANGE",
+      "decision_counts": {
+        "NO_CHANGE": 1
+      },
+      "majority_decision": "NO_CHANGE",
+      "majority_count": 1,
+      "majority_decision_correct": true,
+      "correct_decision_runs": 1,
+      "decision_accuracy": 1.0,
+      "stable_decision": false,
+      "high_confidence_false_positive_runs": 0
+    },
+    {
+      "case_id": "case_007_timeout_requires_caller",
+      "total_runs": 1,
+      "passed_runs": 0,
+      "failed_runs": 1,
+      "pass_rate": 0.0,
+      "stable_pass_outcome": false,
+      "verdict_counts": {
+        "GO_WITH_NOTES": 1
+      },
+      "stable_verdict": false,
+      "retry_runs": 1,
+      "retry_rate": 1.0,
+      "expected_decision": "INSPECT_CONTEXT",
+      "decision_counts": {
+        "CHANGE": 1
+      },
+      "majority_decision": "CHANGE",
+      "majority_count": 1,
+      "majority_decision_correct": false,
+      "correct_decision_runs": 0,
+      "decision_accuracy": 0.0,
+      "stable_decision": false,
+      "high_confidence_false_positive_runs": 0
+    },
+    {
+      "case_id": "case_008_profile_requires_schema",
+      "total_runs": 1,
+      "passed_runs": 0,
+      "failed_runs": 1,
+      "pass_rate": 0.0,
+      "stable_pass_outcome": false,
+      "verdict_counts": {
+        "BLOCK": 1
+      },
+      "stable_verdict": false,
+      "retry_runs": 0,
+      "retry_rate": 0.0,
+      "expected_decision": "INSPECT_CONTEXT",
+      "decision_counts": {
+        "CHANGE": 1
+      },
+      "majority_decision": "CHANGE",
+      "majority_count": 1,
+      "majority_decision_correct": false,
+      "correct_decision_runs": 0,
+      "decision_accuracy": 0.0,
+      "stable_decision": false,
+      "high_confidence_false_positive_runs": 0
+    }
+  ],
+  "runs": [
+    {
+      "run_index": 1,
+      "seed": 11,
+      "summary": {
+        "total": 8,
+        "passed": 4,
+        "failed": 4,
+        "pass_rate": 0.5
+      },
+      "case_results": [
+        {
+          "case_id": "case_001_correct_helper_contract",
+          "audit_valid": true,
+          "verdict": "GO",
+          "confidence": "High",
+          "recommended_action": "NO_CHANGE",
+          "expected_decision": "NO_CHANGE",
+          "actual_decision": "NO_CHANGE",
+          "decision_correct": true,
+          "high_confidence_false_positive": false,
+          "verdict_pass": true,
+          "finding_labels_found": [
+            "FALSE_POSITIVE_CANDIDATE"
+          ],
+          "allowed_action_pass": true,
+          "expected_classifications_pass": true,
+          "allowed_confidence_pass": true,
+          "no_findings_pass": true,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": true,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function correctly delegates the parsing logic to `safe_parse`, which handles empty strings by returning `None` as per its visible contract.\n\n2. Direct critique\nClassification: FALSE_POSITIVE_CANDIDATE\nEvidence: EVIDENCE_HIGH\nWhy: The function simply calls `safe_parse(raw)` and returns its result. Given that `safe_parse` is visible in the context and handles the empty string case, the current implementation is safe based on visible contracts.\nMissing context: none\n\n3. Better option\nNo code change is needed as the function correctly utilizes the provided helper function to meet its apparent goal of safely parsing an optional age string.\n\n4. Next steps\nRecommended action: NO_CHANGE\nTest status: NO_TEST_NEEDED\nReason: The visible code path is simple and relies on a helper function whose behavior is fully visible and sufficient for the current implementation.\n\n5. Top 3 pitfalls\nNo grounded pitfalls are visible.\n\n6. Verdict\nGO\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function correctly delegates the parsing logic to `safe_parse`, which handles empty strings by returning `None` as per its visible contract.\n\n2. Direct critique\nClassification: FALSE_POSITIVE_CANDIDATE\nEvidence: EVIDENCE_HIGH\nWhy: The function simply calls `safe_parse(raw)` and returns its result. Given that `safe_parse` is visible in the context and handles the empty string case, the current implementation is safe based on visible contracts.\nMissing context: none\n\n3. Better option\nNo code change is needed as the function correctly utilizes the provided helper function to meet its apparent goal of safely parsing an optional age string.\n\n4. Next steps\nRecommended action: NO_CHANGE\nTest status: NO_TEST_NEEDED\nReason: The visible code path is simple and relies on a helper function whose behavior is fully visible and sufficient for the current implementation.\n\n5. Top 3 pitfalls\nNo grounded pitfalls are visible.\n\n6. Verdict\nGO\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 1,
+          "seed": 11
+        },
+        {
+          "case_id": "case_002_real_none_bug",
+          "audit_valid": true,
+          "verdict": "BLOCK",
+          "confidence": "High",
+          "recommended_action": "FIX_NOW",
+          "expected_decision": "CHANGE",
+          "actual_decision": "CHANGE",
+          "decision_correct": true,
+          "high_confidence_false_positive": false,
+          "verdict_pass": true,
+          "finding_labels_found": [
+            "REAL_BUG"
+          ],
+          "allowed_action_pass": true,
+          "expected_classifications_pass": true,
+          "allowed_confidence_pass": true,
+          "no_findings_pass": true,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": true,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function `get_name` will raise an AttributeError if the input dictionary `user` is missing the \"name\" key, because `user.get(\"name\")` will return `None`, and calling `.strip()` on `None` is invalid.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The code calls `.strip()` on the result of `user.get(\"name\")`. If \"name\" is missing from `user`, `user.get(\"name\")` returns `None`, causing an AttributeError when `.strip()` is called on it.\nMissing context: None\n\n3. Better option\nThe function should explicitly check if the retrieved name is `None` before attempting to call string methods on it.\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: ADD_TEST_CONFIRMED\nReason: A test case must be added to confirm the behavior when the \"name\" key is missing from the input dictionary.\n\n5. Top 3 pitfalls\nThe primary pitfall is the unhandled `AttributeError` when the \"name\" key is absent in the input dictionary, as `user.get(\"name\")` returns `None` which lacks a `.strip()` method. No additional grounded pitfalls are visible.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function `get_name` will raise an AttributeError if the input dictionary `user` is missing the \"name\" key, because `user.get(\"name\")` will return `None`, and calling `.strip()` on `None` is invalid.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The code calls `.strip()` on the result of `user.get(\"name\")`. If \"name\" is missing from `user`, `user.get(\"name\")` returns `None`, causing an AttributeError when `.strip()` is called on it.\nMissing context: None\n\n3. Better option\nThe function should explicitly check if the retrieved name is `None` before attempting to call string methods on it.\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: ADD_TEST_CONFIRMED\nReason: A test case must be added to confirm the behavior when the \"name\" key is missing from the input dictionary.\n\n5. Top 3 pitfalls\nThe primary pitfall is the unhandled `AttributeError` when the \"name\" key is absent in the input dictionary, as `user.get(\"name\")` returns `None` which lacks a `.strip()` method. No additional grounded pitfalls are visible.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 1,
+          "seed": 11
+        },
+        {
+          "case_id": "case_003_intentional_none_contract",
+          "audit_valid": true,
+          "verdict": "GO_WITH_NOTES",
+          "confidence": "High",
+          "recommended_action": "HARDEN_SMALL",
+          "expected_decision": "NO_CHANGE",
+          "actual_decision": "CHANGE",
+          "decision_correct": false,
+          "high_confidence_false_positive": true,
+          "verdict_pass": false,
+          "finding_labels_found": [
+            "MAINTAINABILITY_HARDENING"
+          ],
+          "allowed_action_pass": false,
+          "expected_classifications_pass": false,
+          "allowed_confidence_pass": true,
+          "no_findings_pass": false,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": false,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function `calculate_discount` has a type mismatch between its declared return type (`int`) and its actual return path when `find_discount` returns `None`, which results in `0` (an `int`). However, the type hint for `find_discount` suggests it can return `None`, and the logic handles this by returning `0`, which is safe but contradicts the explicit return type of `int` if `find_discount` could return `None` and the caller expects the return type to strictly match the hint.\n\n2. Direct critique\nClassification: MAINTAINABILITY_HARDENING\nEvidence: EVIDENCE_HIGH\nWhy: The function signature specifies `-> int`, but the logic `return discount if discount is not None else 0` correctly handles the `None` case from `find_discount` by returning `0` (an `int`). If `find_discount` were to change its return type to `int | None` (as suggested by its implementation), the current logic is sound for achieving an `int` return, but the type hint on `calculate_discount` should reflect this dependency or the dependency should be fixed.\nMissing context: none\n\n3. Better option\nThe type hint for `calculate_discount` should be updated to reflect that it always returns an integer, which is already enforced by the logic, or the return type of `find_discount` should be updated to `int | None` if that is the intended contract. Given the current implementation forces an `int` return, no code change is strictly necessary to fix a bug, but updating the type hint for `find_discount` to `int | None` would improve clarity regarding the dependency.\n\n4. Next steps\nRecommended action: HARDEN_SMALL\nTest status: POSSIBLE_TEST_GAP\nReason: Consider adding a test case that explicitly passes a code to `calculate_discount` that is not in the known discounts to ensure it correctly returns 0.\n\n5. Top 3 pitfalls\nNo grounded pitfalls are visible. The code path appears safe given the visible contract that `find_discount` returns `int | None` and `calculate_discount` guarantees an `int` return.\n\n6. Verdict\nGO_WITH_NOTES\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function `calculate_discount` has a type mismatch between its declared return type (`int`) and its actual return path when `find_discount` returns `None`, which results in `0` (an `int`). However, the type hint for `find_discount` suggests it can return `None`, and the logic handles this by returning `0`, which is safe but contradicts the explicit return type of `int` if `find_discount` could return `None` and the caller expects the return type to strictly match the hint.\n\n2. Direct critique\nClassification: MAINTAINABILITY_HARDENING\nEvidence: EVIDENCE_HIGH\nWhy: The function signature specifies `-> int`, but the logic `return discount if discount is not None else 0` correctly handles the `None` case from `find_discount` by returning `0` (an `int`). If `find_discount` were to change its return type to `int | None` (as suggested by its implementation), the current logic is sound for achieving an `int` return, but the type hint on `calculate_discount` should reflect this dependency or the dependency should be fixed.\nMissing context: none\n\n3. Better option\nThe type hint for `calculate_discount` should be updated to reflect that it always returns an integer, which is already enforced by the logic, or the return type of `find_discount` should be updated to `int | None` if that is the intended contract. Given the current implementation forces an `int` return, no code change is strictly necessary to fix a bug, but updating the type hint for `find_discount` to `int | None` would improve clarity regarding the dependency.\n\n4. Next steps\nRecommended action: HARDEN_SMALL\nTest status: POSSIBLE_TEST_GAP\nReason: Consider adding a test case that explicitly passes a code to `calculate_discount` that is not in the known discounts to ensure it correctly returns 0.\n\n5. Top 3 pitfalls\nNo grounded pitfalls are visible. The code path appears safe given the visible contract that `find_discount` returns `int | None` and `calculate_discount` guarantees an `int` return.\n\n6. Verdict\nGO_WITH_NOTES\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 1,
+          "seed": 11
+        },
+        {
+          "case_id": "case_004_empty_average_bug",
+          "audit_valid": true,
+          "verdict": "BLOCK",
+          "confidence": "High",
+          "recommended_action": "FIX_NOW",
+          "expected_decision": "CHANGE",
+          "actual_decision": "CHANGE",
+          "decision_correct": true,
+          "high_confidence_false_positive": false,
+          "verdict_pass": true,
+          "finding_labels_found": [
+            "REAL_BUG"
+          ],
+          "allowed_action_pass": true,
+          "expected_classifications_pass": true,
+          "allowed_confidence_pass": true,
+          "no_findings_pass": true,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": true,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function `average_score` will raise a ZeroDivisionError when passed an empty list because it does not handle the case where `len(scores)` is zero.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The code attempts division by `len(scores)` without checking if `scores` is empty, leading to ZeroDivisionError if an empty list is passed.\nMissing context: None\n\n3. Better option\nThe function should explicitly check if the input list `scores` is empty and return 0.0 as indicated by the docstring (\"Return 0.0 when no scores are available.\") before performing the division.\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: ADD_TEST_CONFIRMED\nReason: The immediate fix is to add a length check to prevent the runtime crash when an empty list is provided.\n\n5. Top 3 pitfalls\nThe most immediate pitfall is the unhandled `ZeroDivisionError` when `scores` is an empty list, violating the documented contract of returning 0.0. No other grounded pitfalls are visible.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function `average_score` will raise a ZeroDivisionError when passed an empty list because it does not handle the case where `len(scores)` is zero.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The code attempts division by `len(scores)` without checking if `scores` is empty, leading to ZeroDivisionError if an empty list is passed.\nMissing context: None\n\n3. Better option\nThe function should explicitly check if the input list `scores` is empty and return 0.0 as indicated by the docstring (\"Return 0.0 when no scores are available.\") before performing the division.\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: ADD_TEST_CONFIRMED\nReason: The immediate fix is to add a length check to prevent the runtime crash when an empty list is provided.\n\n5. Top 3 pitfalls\nThe most immediate pitfall is the unhandled `ZeroDivisionError` when `scores` is an empty list, violating the documented contract of returning 0.0. No other grounded pitfalls are visible.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 1,
+          "seed": 11
+        },
+        {
+          "case_id": "case_005_partial_transfer_mutation",
+          "audit_valid": true,
+          "verdict": "BLOCK",
+          "confidence": "High",
+          "recommended_action": "FIX_NOW",
+          "expected_decision": "CHANGE",
+          "actual_decision": "CHANGE",
+          "decision_correct": true,
+          "high_confidence_false_positive": false,
+          "verdict_pass": true,
+          "finding_labels_found": [
+            "REAL_BUG"
+          ],
+          "allowed_action_pass": true,
+          "expected_classifications_pass": true,
+          "allowed_confidence_pass": true,
+          "no_findings_pass": true,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [
+            [
+              "keyerror"
+            ]
+          ],
+          "required_keyword_groups_pass": false,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": false,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function performs an atomic transfer by modifying two dictionaries in place without any transaction mechanism, meaning a failure between lines 7 and 8 will result in a partial mutation of the source account.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The function modifies `source` and `target` dictionaries sequentially. If an exception occurs after line 7 (`source[\"balance\"] -= amount`) but before line 8 (`target[\"balance\"] += amount`), the source account will be debited, but the target account will not be credited, violating the stated contract of atomic transfer.\nMissing context: None\n\n3. Better option\nThe function must wrap the operations in a try/finally block or use a mechanism that guarantees both operations succeed or neither does (e.g., by calculating the changes first and applying them together, or by using a transactional context if the underlying data structure supported it). Since the inputs are mutable dicts, the safest approach is to calculate the changes and only apply them if both operations are logically sound, or to revert the first change if the second fails.\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: POSSIBLE_TEST_GAP\nReason: The immediate next step is to refactor the function body to ensure atomicity, likely by implementing rollback logic or restructuring the operations.\n\n5. Top 3 pitfalls\n1. Partial Mutation: If an exception occurs between line 7 and line 8, the source account is debited, but the target account is not credited, leading to data inconsistency.\n2. Lack of Error Handling: The function assumes both dictionary keys (\"balance\") exist and that the subtraction/addition operations will not raise unexpected errors (e.g., if `amount` is negative and the source balance is insufficient, though the type hint suggests `int`).\n3. In-Place Mutation Side Effects: Modifying inputs directly makes testing difficult and increases coupling; if the caller expects the inputs to remain unchanged on failure, this implementation fails that expectation.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function performs an atomic transfer by modifying two dictionaries in place without any transaction mechanism, meaning a failure between lines 7 and 8 will result in a partial mutation of the source account.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The function modifies `source` and `target` dictionaries sequentially. If an exception occurs after line 7 (`source[\"balance\"] -= amount`) but before line 8 (`target[\"balance\"] += amount`), the source account will be debited, but the target account will not be credited, violating the stated contract of atomic transfer.\nMissing context: None\n\n3. Better option\nThe function must wrap the operations in a try/finally block or use a mechanism that guarantees both operations succeed or neither does (e.g., by calculating the changes first and applying them together, or by using a transactional context if the underlying data structure supported it). Since the inputs are mutable dicts, the safest approach is to calculate the changes and only apply them if both operations are logically sound, or to revert the first change if the second fails.\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: POSSIBLE_TEST_GAP\nReason: The immediate next step is to refactor the function body to ensure atomicity, likely by implementing rollback logic or restructuring the operations.\n\n5. Top 3 pitfalls\n1. Partial Mutation: If an exception occurs between line 7 and line 8, the source account is debited, but the target account is not credited, leading to data inconsistency.\n2. Lack of Error Handling: The function assumes both dictionary keys (\"balance\") exist and that the subtraction/addition operations will not raise unexpected errors (e.g., if `amount` is negative and the source balance is insufficient, though the type hint suggests `int`).\n3. In-Place Mutation Side Effects: Modifying inputs directly makes testing difficult and increases coupling; if the caller expects the inputs to remain unchanged on failure, this implementation fails that expectation.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 1,
+          "seed": 11
+        },
+        {
+          "case_id": "case_006_idempotent_cleanup",
+          "audit_valid": true,
+          "verdict": "GO",
+          "confidence": "High",
+          "recommended_action": "NO_CHANGE",
+          "expected_decision": "NO_CHANGE",
+          "actual_decision": "NO_CHANGE",
+          "decision_correct": true,
+          "high_confidence_false_positive": false,
+          "verdict_pass": true,
+          "finding_labels_found": [
+            "FALSE_POSITIVE_CANDIDATE"
+          ],
+          "allowed_action_pass": true,
+          "expected_classifications_pass": true,
+          "allowed_confidence_pass": true,
+          "no_findings_pass": true,
+          "missing_required_finding_labels": [],
+          "required_finding_labels_pass": true,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": true,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nNo blocking issues are visible; the function correctly attempts to remove a file path while safely ignoring errors if the file does not exist.\n\n2. Direct critique\nClassification: FALSE_POSITIVE_CANDIDATE\nEvidence: EVIDENCE_HIGH\nWhy: The use of `path.unlink(missing_ok=True)` ensures that if the file does not exist, no exception is raised, which is the desired safe behavior for cleanup.\nMissing context: none\n\n3. Better option\nNo code change is needed as the current implementation is idiomatic and safe for idempotent file removal.\n\n4. Next steps\nRecommended action: NO_CHANGE\nTest status: NO_TEST_NEEDED\nReason: The function's behavior is simple and safe given the `missing_ok=True` flag, requiring no immediate action.\n\n5. Top 3 pitfalls\nNo grounded pitfalls are visible.\n\n6. Verdict\nGO\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nNo blocking issues are visible; the function correctly attempts to remove a file path while safely ignoring errors if the file does not exist.\n\n2. Direct critique\nClassification: FALSE_POSITIVE_CANDIDATE\nEvidence: EVIDENCE_HIGH\nWhy: The use of `path.unlink(missing_ok=True)` ensures that if the file does not exist, no exception is raised, which is the desired safe behavior for cleanup.\nMissing context: none\n\n3. Better option\nNo code change is needed as the current implementation is idiomatic and safe for idempotent file removal.\n\n4. Next steps\nRecommended action: NO_CHANGE\nTest status: NO_TEST_NEEDED\nReason: The function's behavior is simple and safe given the `missing_ok=True` flag, requiring no immediate action.\n\n5. Top 3 pitfalls\nNo grounded pitfalls are visible.\n\n6. Verdict\nGO\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 1,
+          "seed": 11
+        },
+        {
+          "case_id": "case_007_timeout_requires_caller",
+          "audit_valid": true,
+          "verdict": "GO_WITH_NOTES",
+          "confidence": "High",
+          "recommended_action": "HARDEN_SMALL",
+          "expected_decision": "INSPECT_CONTEXT",
+          "actual_decision": "CHANGE",
+          "decision_correct": false,
+          "high_confidence_false_positive": false,
+          "verdict_pass": true,
+          "finding_labels_found": [
+            "PLAUSIBLE_RISK"
+          ],
+          "allowed_action_pass": false,
+          "expected_classifications_pass": false,
+          "allowed_confidence_pass": false,
+          "no_findings_pass": true,
+          "missing_required_finding_labels": [
+            "NEEDS_CONTEXT"
+          ],
+          "required_finding_labels_pass": false,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [
+            [
+              "caller",
+              "validation"
+            ]
+          ],
+          "required_keyword_groups_pass": false,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": false,
+          "retry_used": true,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function `parse_timeout` relies on `int(raw)` which will raise a `ValueError` if the input string `raw` cannot be parsed as an integer, but the function signature and visible context do not define how this failure should be handled.\n\n2. Direct critique\nClassification: PLAUSIBLE_RISK\nEvidence: EVIDENCE_HIGH\nWhy: The function uses `int(raw)` without any surrounding try/except block, meaning any non-integer string input will cause an unhandled `ValueError`.\nMissing context: None\n\n3. Better option\nWrap the conversion in a try/except block to handle `ValueError` explicitly, or update the type hint/docstring to reflect the expected error handling policy (e.g., returning an Optional[int] or raising a custom exception).\n\n4. Next steps\nRecommended action: HARDEN_SMALL\nTest status: POSSIBLE_TEST_GAP\nReason: The function should be hardened to explicitly handle non-integer string inputs to prevent unhandled runtime exceptions.\n\n5. Top 3 pitfalls\n1. Failure to handle non-integer strings: Passing any string that cannot be cast to an integer (e.g., \"abc\") will cause an unhandled `ValueError`, crashing the execution path.\n2. Implicit contract violation: The function signature implies a successful integer return, but the implementation allows for runtime exceptions based on input content.\n3. Lack of explicit error return: There is no defined fallback or error return path for invalid input strings.\n\n6. Verdict\nGO_WITH_NOTES\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function `parse_timeout` assumes the input string `raw` can always be successfully converted to an integer, which is a potential runtime failure point if the input is non-numeric.\n\n2. Direct critique\nClassification: PLAUSIBLE_RISK\nEvidence: EVIDENCE_HIGH\nWhy: The function uses `int(raw)` without any error handling (try/except block). If `raw` is a string that cannot be parsed as an integer (e.g., \"abc\"), this will raise a `ValueError`.\nMissing context: None\n\n3. Better option\nWrap the conversion in a `try...except ValueError` block to handle invalid string inputs gracefully, perhaps by logging the error and returning a default or raising a more specific, controlled exception.\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: POSSIBLE_TEST_GAP\nReason: The function needs explicit error handling for non-integer strings to prevent unhandled `ValueError` crashes.\n\n5. Top 3 pitfalls\n1. Failure on non-integer strings: Passing any string that cannot be parsed as an integer (e.g., \"timeout_ms\") will cause an unhandled `ValueError` crash.\n2. Type mismatch: If the caller passes `None` or another non-string type that `int()` does not accept, a different runtime error might occur.\n3. Lack of context on failure: The current implementation provides no mechanism for the caller to know *why* the parsing failed, only that it crashed.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_validation_errors": [
+            "BLOCK verdict requires at least one REAL_BUG finding with EVIDENCE_HIGH."
+          ],
+          "retry_response": "1. Bottom line\nThe function `parse_timeout` relies on `int(raw)` which will raise a `ValueError` if the input string `raw` cannot be parsed as an integer, but the function signature and visible context do not define how this failure should be handled.\n\n2. Direct critique\nClassification: PLAUSIBLE_RISK\nEvidence: EVIDENCE_HIGH\nWhy: The function uses `int(raw)` without any surrounding try/except block, meaning any non-integer string input will cause an unhandled `ValueError`.\nMissing context: None\n\n3. Better option\nWrap the conversion in a try/except block to handle `ValueError` explicitly, or update the type hint/docstring to reflect the expected error handling policy (e.g., returning an Optional[int] or raising a custom exception).\n\n4. Next steps\nRecommended action: HARDEN_SMALL\nTest status: POSSIBLE_TEST_GAP\nReason: The function should be hardened to explicitly handle non-integer string inputs to prevent unhandled runtime exceptions.\n\n5. Top 3 pitfalls\n1. Failure to handle non-integer strings: Passing any string that cannot be cast to an integer (e.g., \"abc\") will cause an unhandled `ValueError`, crashing the execution path.\n2. Implicit contract violation: The function signature implies a successful integer return, but the implementation allows for runtime exceptions based on input content.\n3. Lack of explicit error return: There is no defined fallback or error return path for invalid input strings.\n\n6. Verdict\nGO_WITH_NOTES\n\n7. Confidence\nHigh",
+          "retry_validation_errors": [],
+          "run_index": 1,
+          "seed": 11
+        },
+        {
+          "case_id": "case_008_profile_requires_schema",
+          "audit_valid": true,
+          "verdict": "BLOCK",
+          "confidence": "High",
+          "recommended_action": "FIX_NOW",
+          "expected_decision": "INSPECT_CONTEXT",
+          "actual_decision": "CHANGE",
+          "decision_correct": false,
+          "high_confidence_false_positive": false,
+          "verdict_pass": false,
+          "finding_labels_found": [
+            "REAL_BUG"
+          ],
+          "allowed_action_pass": false,
+          "expected_classifications_pass": false,
+          "allowed_confidence_pass": false,
+          "no_findings_pass": true,
+          "missing_required_finding_labels": [
+            "NEEDS_CONTEXT"
+          ],
+          "required_finding_labels_pass": false,
+          "missing_required_claims": [],
+          "required_claims_pass": true,
+          "missing_required_keyword_groups": [],
+          "required_keyword_groups_pass": true,
+          "matched_forbidden_claims": [],
+          "forbidden_claims_pass": true,
+          "passed": false,
+          "retry_used": false,
+          "validation_errors": [],
+          "response": "1. Bottom line\nThe function assumes the input dictionary `profile` will always contain the key `\"display_name\"`, which could lead to a runtime `KeyError` if the key is missing.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The code accesses `profile[\"display_name\"]` without checking for the key's existence, which will raise a `KeyError` if `\"display_name\"` is absent from the input `profile` dictionary.\nMissing context: None\n\n3. Better option\nThe function should use `.get()` with a default value or check for the key's existence before access to prevent a `KeyError`.\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: POSSIBLE_TEST_GAP\nReason: A test case must be added to verify behavior when the required key is missing from the input dictionary.\n\n5. Top 3 pitfalls\nThe most immediate pitfall is the unhandled `KeyError` if the input `profile` dictionary lacks the `\"display_name\"` key. A secondary pitfall is that if `\"display_name\"` exists but is `None`, calling `.strip()` on it will raise an `AttributeError`. A third pitfall is that if `\"display_name\"` is a non-string type (e.g., an integer), `.strip()` will raise an `AttributeError`.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_response": "1. Bottom line\nThe function assumes the input dictionary `profile` will always contain the key `\"display_name\"`, which could lead to a runtime `KeyError` if the key is missing.\n\n2. Direct critique\nClassification: REAL_BUG\nEvidence: EVIDENCE_HIGH\nWhy: The code accesses `profile[\"display_name\"]` without checking for the key's existence, which will raise a `KeyError` if `\"display_name\"` is absent from the input `profile` dictionary.\nMissing context: None\n\n3. Better option\nThe function should use `.get()` with a default value or check for the key's existence before access to prevent a `KeyError`.\n\n4. Next steps\nRecommended action: FIX_NOW\nTest status: POSSIBLE_TEST_GAP\nReason: A test case must be added to verify behavior when the required key is missing from the input dictionary.\n\n5. Top 3 pitfalls\nThe most immediate pitfall is the unhandled `KeyError` if the input `profile` dictionary lacks the `\"display_name\"` key. A secondary pitfall is that if `\"display_name\"` exists but is `None`, calling `.strip()` on it will raise an `AttributeError`. A third pitfall is that if `\"display_name\"` is a non-string type (e.g., an integer), `.strip()` will raise an `AttributeError`.\n\n6. Verdict\nBLOCK\n\n7. Confidence\nHigh",
+          "first_validation_errors": [],
+          "retry_response": null,
+          "retry_validation_errors": [],
+          "run_index": 1,
+          "seed": 11
+        }
+      ]
+    }
+  ]
+}

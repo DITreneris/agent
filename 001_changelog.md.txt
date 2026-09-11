@@ -1,5 +1,166 @@
 # Changelog
 
+## 2026-09-11 — Evidence-Boundary Last-Shot and Reviewer Close (Unreleased)
+
+### Added
+
+- Added an evidence-boundary block to `build_file_audit_prompt` that
+  distinguishes a visible contract violation, an observable exception
+  without that contract, and a proven safe path.
+- Tightened BLOCK and High confidence so a reachable raise is not
+  enough without a visible type, docstring, or named contract.
+
+### Tested
+
+- Full suite via WSL venv: `194 passed, 1 warning`.
+- WSL Ollama smoke, seed `11`, `num_ctx` `8192`:
+  - structurally valid: `8 of 8`;
+  - scored pass: `4 of 8`;
+  - `INSPECT_CONTEXT` runs: `0 of 2`;
+  - high-confidence false positive: `1` on case 003;
+  - runtime: about 142 seconds.
+- Full locked live run, `gemma4:e4b`, temperature `0.1`, `8192`,
+  seeds `11`, `22`, and `33`:
+  - structurally valid outputs: `24 of 24`;
+  - correct majority decisions: `5 of 8`;
+  - correct run-level decisions: `16 of 24`;
+  - proven defects: `3 of 3` cases and `9 of 9` runs;
+  - safe cases correct by majority: `2 of 3`;
+  - context cases correct by majority: `0 of 2`;
+  - correct `INSPECT_CONTEXT` runs: `0 of 6`;
+  - high-confidence false positives: `2`;
+  - case 003 majority: `CHANGE`;
+  - overall gate: failed;
+  - runtime: about 387 seconds;
+  - result SHA256:
+    `25be46ee687a929444ce4e2cd3be06eb821d93ea33e65fbefaac6758ac4b2428`.
+- Validator, retry, corpus, and seeds were not changed.
+- Post-hardening and v2 result files were not overwritten.
+
+### Findings
+
+- Context recall remained zero. Cases 007 and 008 still treated a
+  reachable exception as a confirmed defect.
+- Case 003 majority flipped from `NO_CHANGE` on the post-hardening
+  re-baseline to `CHANGE`, with two high-confidence false positives.
+- Prompt wording of the evidence boundary was not sufficient to make
+  `gemma4:e4b` abstain on missing caller or schema evidence.
+
+### Decision
+
+- The locked one-variable last-shot is complete and failed.
+- Close the reviewer program. Keep the repository, validator,
+  `--replay-json`, eight-case lock, and CLI.
+- Do not run a field sample.
+- Do not start another prompt, validator, or model experiment
+  unless a new written hypothesis exists.
+
+## 2026-09-11 — Post-Hardening Decision Benchmark Re-baseline (Unreleased)
+
+### Added
+
+- Added `--replay-json` to the evaluation CLI so a captured 24-run
+  report can be re-validated and re-scored without calling Ollama.
+- Reconstructed captured first and retry attempts against the current
+  validator, without inventing a retry that was never stored.
+- Recorded per-row drift against the original `audit_valid`, `passed`,
+  and `retry_used` values.
+
+### Tested
+
+- Full suite via WSL venv: `194 passed, 1 warning`.
+- Offline replay of
+  `evaluation_results/decision_grade_benchmark_v2_baseline.json`:
+  - structurally valid reconstructed outputs: `24 of 24`;
+  - drift: `0` `audit_valid`, `0` `passed`, `0` `retry_used`;
+  - rows needing a live retry: `0`;
+  - high-confidence false positives on captured texts: `1`;
+  - context recall: `0 of 6`;
+  - overall gate: failed.
+- WSL Ollama smoke, seed `11`, `num_ctx` `8192`:
+  - structurally valid: `8 of 8`;
+  - scored pass: `5 of 8`;
+  - high-confidence false positive: `1` on case 003;
+  - runtime: about 108 seconds.
+- Full locked live re-baseline, `gemma4:e4b`, temperature `0.1`,
+  `8192`, seeds `11`, `22`, and `33`:
+  - structurally valid outputs: `24 of 24`;
+  - correct majority decisions: `6 of 8`;
+  - correct run-level decisions: `18 of 24`;
+  - proven defects: `3 of 3` cases and `9 of 9` runs;
+  - safe cases correct by majority: `3 of 3`;
+  - context cases correct by majority: `0 of 2`;
+  - correct `INSPECT_CONTEXT` runs: `0 of 6`;
+  - high-confidence false positives: `0`;
+  - case 003: `3 of 3` correct, all after retry;
+  - overall gate: failed;
+  - runtime: about 372 seconds;
+  - result SHA256:
+    `79f6336d578cbfb3fcfe8f47f0f5edf468a27343bb6af5a4d326a2f3df2aa50b`.
+- Focused audit prompt evidence rules in `build_file_audit_prompt`
+  are unchanged.
+- Recorded v2 baseline JSON was not overwritten.
+
+### Findings
+
+- Hardening did not change structural validity of the captured v2
+  texts.
+- Live context recall remained zero. Cases 007 and 008 still received
+  `FIX_NOW`, `BLOCK`, and High in every seed.
+- The live high-confidence false-positive drop versus v2 cannot be
+  attributed to hardening: replay of the same v2 texts still has one
+  HCFP, and the seed-11 smoke accepted a case-003 HCFP that the later
+  full run repaired.
+
+### Decision
+
+- Treat the live 24-run as a failed reviewer re-baseline, not a
+  reviewer experiment.
+- Do not treat the live HCFP count of `0` as a hardening win.
+- Keep the next change to one variable: the evidence boundary in the
+  focused audit prompt.
+- Do not run a real-repository field sample until the synthetic gate
+  passes.
+
+## 2026-09-11 — Validator Hardening (Unreleased)
+
+### Added
+
+- Normalized optional markdown bullets on contract labels so enum
+  validation matches the prompt and the evaluation scorer.
+- Parsed section-2 findings so BLOCK requires REAL_BUG and
+  EVIDENCE_HIGH on the same finding.
+- Rejected EVIDENCE_LOW code-change recommendations only when every parsed
+  finding is EVIDENCE_LOW.
+- Substituted the retry repair prompt without `str.format`, so braces
+  in invalid model values cannot crash retry.
+- Shared `relative_to` path confinement across focused audits, `/inspect`,
+  and `/read_file`.
+- Printed the benchmark gate on the evaluation CLI while keeping exit
+  code 0.
+- Defaulted evaluation `--num-ctx` to `8192` to match the locked v2
+  benchmark. Live `/audit_*` still defaults to `4096`.
+- Required NO_CHANGE majority count `>= 2`, matching CHANGE and
+  INSPECT_CONTEXT.
+- Directed the general system prompt to focused audit commands instead of
+  `/audit_file`.
+- Broadened case 002's first keyword group to `name` so a correct None
+  writeup is not failed for omitting "missing".
+
+### Tested
+
+- Full suite via WSL venv: `184 passed, 1 warning`.
+- No new Ollama run. Recorded v2 baseline JSON is unchanged.
+- Existing validator error strings for single-finding cases are preserved.
+- Focused audit prompt evidence rules in `build_file_audit_prompt` are
+  unchanged.
+
+### Decision
+
+- This is tooling correctness, not a new reviewer experiment.
+- Do not treat the historical 24/24 structural-validity figure as a
+  re-run against the hardened validator.
+
 ## 2026-09-01 — Contract-Grounded Decision Benchmark v2 (Unreleased)
 
 ### Added

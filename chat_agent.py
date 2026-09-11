@@ -202,6 +202,21 @@ class SelectedCodeAuditPreparation:
     end_line: int
 
 
+def resolve_project_file(
+    project_root: Path,
+    file_name: str,
+) -> Path:
+    resolved_project_root = project_root.resolve()
+    file_path = (resolved_project_root / file_name).resolve()
+
+    try:
+        file_path.relative_to(resolved_project_root)
+    except ValueError:
+        raise ValueError(f"Access denied: {file_name}")
+
+    return file_path
+
+
 def prepare_selected_code_audit(
     project_root: Path,
     file_name: str,
@@ -214,13 +229,7 @@ def prepare_selected_code_audit(
     if end_line - start_line + 1 > MAX_AUDIT_LINES:
         raise ValueError(f"Maximum audit range is {MAX_AUDIT_LINES} lines.")
 
-    resolved_project_root = project_root.resolve()
-    file_path = (resolved_project_root / file_name).resolve()
-
-    try:
-        file_path.relative_to(resolved_project_root)
-    except ValueError:
-        raise ValueError(f"Access denied: {file_name}")
+    file_path = resolve_project_file(project_root, file_name)
 
     if not file_path.exists():
         raise ValueError(f"File not found: {file_name}")
@@ -778,11 +787,13 @@ def handle_memory_command(user_input: str):
         if not file_name:
             return "Usage: /inspect <path>"
 
-        project_root = PROJECT_ROOT.resolve()
-        file_path = (project_root / file_name).resolve()
-
-        if not str(file_path).startswith(str(project_root)):
-            return f"Access denied: {file_name}"
+        try:
+            file_path = resolve_project_file(
+                PROJECT_ROOT,
+                file_name,
+            )
+        except ValueError as exc:
+            return str(exc)
 
         if not file_path.exists():
             return f"File not found: {file_name}"
@@ -800,13 +811,13 @@ def handle_memory_command(user_input: str):
 
         file_name, function_name = arguments
 
-        project_root = PROJECT_ROOT.resolve()
-        file_path = (project_root / file_name).resolve()
-
         try:
-            file_path.relative_to(project_root)
-        except ValueError:
-            return f"Access denied: {file_name}"
+            file_path = resolve_project_file(
+                PROJECT_ROOT,
+                file_name,
+            )
+        except ValueError as exc:
+            return str(exc)
 
         if not file_path.exists():
             return f"File not found: {file_name}"
@@ -867,13 +878,13 @@ def handle_memory_command(user_input: str):
         if not class_name or not method_name:
             return "Usage: /audit_method <path> <ClassName.method_name>"
 
-        project_root = PROJECT_ROOT.resolve()
-        file_path = (project_root / file_name).resolve()
-
         try:
-            file_path.relative_to(project_root)
-        except ValueError:
-            return f"Access denied: {file_name}"
+            file_path = resolve_project_file(
+                PROJECT_ROOT,
+                file_name,
+            )
+        except ValueError as exc:
+            return str(exc)
 
         if not file_path.exists():
             return f"File not found: {file_name}"
@@ -1005,11 +1016,13 @@ Return only:
         if not file_name:
             return "Usage: /read_file <path>"
 
-        project_root = PROJECT_ROOT.resolve()
-        file_path = (project_root / file_name).resolve()
-
-        if not str(file_path).startswith(str(project_root)):
-            return f"Access denied: {file_name}"
+        try:
+            file_path = resolve_project_file(
+                PROJECT_ROOT,
+                file_name,
+            )
+        except ValueError as exc:
+            return str(exc)
 
         if not file_path.exists():
             return f"File not found: {file_name}"

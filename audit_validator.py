@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import re
 
 
 REQUIRED_SECTIONS = [
@@ -124,11 +125,135 @@ REAL_BUG_GO_NO_TEST_ERROR = (
     "REAL_BUG finding cannot use GO verdict with NO_TEST_NEEDED."
 )
 
+QUOTE_STRIP_TABLE = str.maketrans("", "", "\"'`“”‘’")
+
+LOW_EVIDENCE_INVENTION_MARKERS = (
+    "caller might expect",
+    "caller expects",
+    "caller's expected",
+    "business rule",
+    "product requirement",
+    "required behavior",
+    "should it be",
+    "if the goal is",
+    "if the contract requires",
+    "if the upstream contract expects",
+    "unstated requirement",
+)
+
+HYPOTHETICAL_REQUIREMENT_MARKERS = (
+    "if the caller expects",
+    "if callers expect",
+    "if the product requires",
+    "if the business rule requires",
+    "if the contract requires",
+    "if this is not the desired",
+    "if that is not the desired",
+    "if 0 is not the desired",
+)
+
+CODE_CHANGE_ACTIONS = [
+    "Recommended action: HARDEN_SMALL",
+    "Recommended action: FIX_NOW",
+    "Recommended action: REFACTOR_LATER",
+    "Recommended action: ADD_TEST_CONFIRMED",
+]
+
 
 @dataclass
 class AuditValidationResult:
     valid: bool
     errors: list[str] = field(default_factory=list)
+
+
+@dataclass
+class AuditFinding:
+    classification: str
+    evidence: str
+    why: str
+    missing_context: str
+
+
+def _normalize_contract_line(line: str) -> str:
+    normalized = line.strip()
+
+    if normalized.startswith("- "):
+        normalized = normalized[2:].strip()
+
+    return normalized
+
+
+def _value_after_label(line: str, label: str) -> str | None:
+    prefix = f"{label}:"
+    normalized = _normalize_contract_line(line)
+
+    if not normalized.startswith(prefix):
+        return None
+
+    return normalized[len(prefix):].strip()
+
+
+def _extract_findings(direct_critique: str) -> list[AuditFinding]:
+    findings: list[AuditFinding] = []
+    current: dict[str, str] | None = None
+    last_field: str | None = None
+
+    def flush() -> None:
+        nonlocal current
+
+        if current is None:
+            return
+
+        findings.append(
+            AuditFinding(
+                classification=current.get("classification", ""),
+                evidence=current.get("evidence", ""),
+                why=current.get("why", ""),
+                missing_context=current.get("missing_context", ""),
+            )
+        )
+        current = None
+
+    for line in direct_critique.splitlines():
+        classification = _value_after_label(line, "Classification")
+        if classification is not None:
+            flush()
+            current = {
+                "classification": classification,
+                "evidence": "",
+                "why": "",
+                "missing_context": "",
+            }
+            last_field = "classification"
+            continue
+
+        if current is None:
+            continue
+
+        evidence = _value_after_label(line, "Evidence")
+        if evidence is not None:
+            current["evidence"] = evidence
+            last_field = "evidence"
+            continue
+
+        why = _value_after_label(line, "Why")
+        if why is not None:
+            current["why"] = why
+            last_field = "why"
+            continue
+
+        missing_context = _value_after_label(line, "Missing context")
+        if missing_context is not None:
+            current["missing_context"] = missing_context
+            last_field = "missing_context"
+            continue
+
+        normalized = _normalize_contract_line(line)
+        if last_field == "why" and normalized:
+            current["why"] = f"{current['why']} {normalized}".strip()
+
+    flush()
+    return findings
 
 
 def _extract_section_content(
@@ -172,7 +297,7 @@ def _extract_verdict(response: str) -> str:
         "7. Confidence",
     )
 
-    return verdict_content.strip()
+    return verdict_content.strip().rstrip(".")
 
 
 def _extract_confidence(response: str) -> str:
@@ -192,13 +317,12 @@ def _validate_labeled_values(
     section: str,
     errors: list[str],
 ) -> None:
-    prefix = f"{label}:"
+    values: list[str] = []
 
-    values = [
-        line.strip().removeprefix(prefix).strip()
-        for line in content.splitlines()
-        if line.strip().startswith(prefix)
-    ]
+    for line in content.splitlines():
+        value = _value_after_label(line, label)
+        if value is not None:
+            values.append(value)
 
     for value in values:
         if value not in allowed_values:
@@ -262,16 +386,136 @@ def _validate_contract_values(
         errors.append(f"Invalid Confidence value: '{confidence}'.")
 
 
+def _has_real_bug_high_evidence(
+    findings: list[AuditFinding],
+    cleaned: str,
+) -> bool:
+    if findings:
+        return any(
+            finding.classification == "REAL_BUG"
+            and finding.evidence == "EVIDENCE_HIGH"
+            for finding in findings
+        )
+
+    return (
+        "Classification: REAL_BUG" in cleaned
+        and "Evidence: EVIDENCE_HIGH" in cleaned
+    )
+
+
+def _has_only_low_evidence(
+    findings: list[AuditFinding],
+    direct_critique: str,
+) -> bool:
+    if findings:
+        return all(
+            finding.evidence == "EVIDENCE_LOW"
+            for finding in findings
+        )
+
+    evidence_values = [
+        _value_after_label(line, "Evidence")
+        for line in direct_critique.splitlines()
+    ]
+    evidence_values = [
+        value
+        for value in evidence_values
+        if value is not None
+    ]
+
+    return bool(evidence_values) and all(
+        value == "EVIDENCE_LOW"
+        for value in evidence_values
+    )
+
+
+def _recommends_code_change(cleaned: str) -> bool:
+    return any(
+        action in cleaned
+        for action in CODE_CHANGE_ACTIONS
+    )
+
+
+def _normalize_why(text: str) -> str:
+    return text.lower().translate(QUOTE_STRIP_TABLE)
+
+
+def _validate_finding_hypothetical_markers(
+    findings: list[AuditFinding],
+    errors: list[str],
+) -> None:
+    high_evidence_error_added = False
+    low_evidence_error_added = False
+
+    for finding in findings:
+        why_lower = finding.why.lower()
+        normalized_why = _normalize_why(finding.why)
+
+        if (
+            not high_evidence_error_added
+            and finding.evidence == "EVIDENCE_HIGH"
+            and any(
+                marker in normalized_why
+                for marker in HYPOTHETICAL_REQUIREMENT_MARKERS
+            )
+        ):
+            errors.append(
+                HIGH_EVIDENCE_HYPOTHETICAL_REQUIREMENT_ERROR
+            )
+            high_evidence_error_added = True
+
+        if (
+            not low_evidence_error_added
+            and finding.evidence == "EVIDENCE_LOW"
+            and any(
+                marker in why_lower
+                for marker in LOW_EVIDENCE_INVENTION_MARKERS
+            )
+        ):
+            errors.append(LOW_EVIDENCE_INVENTED_REQUIREMENT_ERROR)
+            low_evidence_error_added = True
+
+
+def _validate_substring_hypothetical_markers(
+    direct_critique: str,
+    cleaned: str,
+    errors: list[str],
+) -> None:
+    high_evidence = "Evidence: EVIDENCE_HIGH" in cleaned
+    low_evidence = "Evidence: EVIDENCE_LOW" in cleaned
+    normalized_direct_critique = _normalize_why(direct_critique)
+
+    if high_evidence and any(
+        marker in normalized_direct_critique
+        for marker in HYPOTHETICAL_REQUIREMENT_MARKERS
+    ):
+        errors.append(
+            HIGH_EVIDENCE_HYPOTHETICAL_REQUIREMENT_ERROR
+        )
+
+    if low_evidence and any(
+        marker in direct_critique.lower()
+        for marker in LOW_EVIDENCE_INVENTION_MARKERS
+    ):
+        errors.append(LOW_EVIDENCE_INVENTED_REQUIREMENT_ERROR)
+
+
 def _validate_calibration_contract(
     cleaned: str,
     errors: list[str],
 ) -> None:
     verdict = _extract_verdict(cleaned)
     confidence = _extract_confidence(cleaned)
+    direct_critique = _extract_section_content(
+        cleaned,
+        "2. Direct critique",
+        "3. Better option",
+    )
+    findings = _extract_findings(direct_critique)
 
-    has_real_bug_high_evidence = (
-        "Classification: REAL_BUG" in cleaned
-        and "Evidence: EVIDENCE_HIGH" in cleaned
+    has_real_bug_high_evidence = _has_real_bug_high_evidence(
+        findings,
+        cleaned,
     )
 
     if verdict == "BLOCK" and not has_real_bug_high_evidence:
@@ -280,88 +524,35 @@ def _validate_calibration_contract(
     if "Evidence: EVIDENCE_LOW" in cleaned and confidence == "High":
         errors.append(LOW_EVIDENCE_HIGH_CONFIDENCE_ERROR)
 
-    low_evidence = "Evidence: EVIDENCE_LOW" in cleaned
-    code_change_actions = [
-        "Recommended action: HARDEN_SMALL",
-        "Recommended action: FIX_NOW",
-        "Recommended action: REFACTOR_LATER",
-        "Recommended action: ADD_TEST_CONFIRMED",
-    ]
+    has_only_low_evidence = _has_only_low_evidence(
+        findings,
+        direct_critique,
+    )
 
-    if low_evidence and any(
-        action in cleaned
-        for action in code_change_actions
+    if findings:
+        should_reject_low_code_change = has_only_low_evidence
+    else:
+        should_reject_low_code_change = (
+            "Evidence: EVIDENCE_LOW" in cleaned
+        )
+
+    if (
+        should_reject_low_code_change
+        and _recommends_code_change(cleaned)
     ):
         errors.append(LOW_EVIDENCE_CODE_CHANGE_ERROR)
-
-    direct_critique = _extract_section_content(
-        cleaned,
-        "2. Direct critique",
-        "3. Better option",
-    )
-
-    evidence_labels = [
-        line.strip()
-        for line in direct_critique.splitlines()
-        if line.strip().startswith("Evidence:")
-    ]
-
-    has_only_low_evidence = (
-        bool(evidence_labels)
-        and all(
-            line == "Evidence: EVIDENCE_LOW"
-            for line in evidence_labels
-        )
-    )
 
     if has_only_low_evidence and verdict != "GO":
         errors.append(ONLY_LOW_EVIDENCE_GO_ERROR)
 
-    low_evidence_invention_markers = (
-        "caller might expect",
-        "caller expects",
-        "caller's expected",
-        "business rule",
-        "product requirement",
-        "required behavior",
-        "should it be",
-        "if the goal is",
-        "if the contract requires",
-        "if the upstream contract expects",
-        "unstated requirement",
-    )
-
-    high_evidence = "Evidence: EVIDENCE_HIGH" in cleaned
-
-    hypothetical_requirement_markers = (
-        "if the caller expects",
-        "if callers expect",
-        "if the product requires",
-        "if the business rule requires",
-        "if the contract requires",
-        "if this is not the desired",
-        "if that is not the desired",
-        "if 0 is not the desired",
-    )
-
-    normalized_direct_critique = direct_critique.lower().translate(
-        str.maketrans("", "", "\"'`“”‘’")
-    )
-
-    if high_evidence and any(
-        marker in normalized_direct_critique
-        for marker in hypothetical_requirement_markers
-    ):
-        errors.append(
-            HIGH_EVIDENCE_HYPOTHETICAL_REQUIREMENT_ERROR
+    if findings:
+        _validate_finding_hypothetical_markers(findings, errors)
+    else:
+        _validate_substring_hypothetical_markers(
+            direct_critique,
+            cleaned,
+            errors,
         )
-
-    if low_evidence and any(
-        marker in direct_critique.lower()
-        for marker in low_evidence_invention_markers
-    ):
-        errors.append(LOW_EVIDENCE_INVENTED_REQUIREMENT_ERROR)
-
 
     has_real_bug = "Classification: REAL_BUG" in cleaned
     recommends_no_change = "Recommended action: NO_CHANGE" in cleaned
@@ -406,6 +597,16 @@ def _validate_calibration_contract(
 
     if "Evidence: EVIDENCE_MEDIUM" in cleaned and confidence == "High":
         errors.append(MEDIUM_EVIDENCE_HIGH_CONFIDENCE_ERROR)
+
+
+def _helper_name_is_mentioned(
+    context_name: str,
+    direct_critique_lower: str,
+) -> bool:
+    return re.search(
+        rf"\b{re.escape(context_name.lower())}\b",
+        direct_critique_lower,
+    ) is not None
 
 
 def validate_audit_output(
@@ -514,20 +715,22 @@ def validate_audit_output(
         )
         direct_critique_lower = direct_critique.lower()
 
-        missing_context_values = [
-            line.partition(":")[2].strip()
-            for line in direct_critique.splitlines()
-            if line.lower().startswith("missing context:")
-        ]
+        missing_context_values: list[str] = []
+
+        for line in direct_critique.splitlines():
+            value = _value_after_label(line, "Missing context")
+            if value is not None:
+                missing_context_values.append(value)
         missing_context_is_claimed = any(
             value.lower().rstrip(".") not in {"", "none"}
             for value in missing_context_values
         )
 
         for context_name in sorted(available_context_names):
-            name_lower = context_name.lower()
-
-            helper_is_named = name_lower in direct_critique_lower
+            helper_is_named = _helper_name_is_mentioned(
+                context_name,
+                direct_critique_lower,
+            )
             helper_contract_is_claimed_missing = any(
                 phrase in direct_critique_lower
                 for phrase in (

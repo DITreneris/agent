@@ -680,3 +680,29 @@ def test_export_audit_case_command_is_listed_in_help():
         result = handle_memory_command(command)
 
         assert "/export_audit_case <id>" in result
+
+
+def test_inspect_and_read_file_reject_sibling_prefix_path(
+    tmp_path,
+    monkeypatch,
+):
+    project = tmp_path / "proj"
+    project.mkdir()
+    (project / "inside.py").write_text("x = 1\n", encoding="utf-8")
+
+    sibling = tmp_path / "proj_backup"
+    sibling.mkdir()
+    secret = sibling / "secrets.txt"
+    secret.write_text("secret\n", encoding="utf-8")
+
+    monkeypatch.setattr(chat_agent, "PROJECT_ROOT", project)
+
+    inspect_result = handle_memory_command(
+        f"/inspect {secret}"
+    )
+    read_result = handle_memory_command(
+        f"/read_file {secret}"
+    )
+
+    assert inspect_result == f"Access denied: {secret}"
+    assert read_result == f"Access denied: {secret}"

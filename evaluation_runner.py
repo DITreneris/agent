@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import partial
 import json
 from pathlib import Path
@@ -12,6 +13,8 @@ from audit_runner import ValidatedAuditResult, run_validated_audit
 from audit_validator import (
     _extract_confidence,
     _extract_verdict,
+    _normalize_contract_line,
+    validate_audit_output,
 )
 
 from chat_agent import prepare_selected_code_audit, run_ollama_audit
@@ -90,11 +93,7 @@ def _extract_finding_labels(response: str) -> list[str]:
     labels: list[str] = []
 
     for line in response.splitlines():
-        normalized = line.strip()
-
-        if normalized.startswith("- "):
-            normalized = normalized[2:].strip()
-
+        normalized = _normalize_contract_line(line)
         prefix = "Classification:"
         if not normalized.startswith(prefix):
             continue
@@ -122,9 +121,7 @@ def extract_recommended_action(response: str) -> str:
         if not in_next_steps:
             continue
 
-        if normalized.startswith("- "):
-            normalized = normalized[2:].strip()
-
+        normalized = _normalize_contract_line(line)
         prefix = "Recommended action:"
 
         if normalized.startswith(prefix):
@@ -307,6 +304,285 @@ def score_evaluation_result(
             and expected_classifications_pass
             and allowed_confidence_pass
         ),
+    }
+
+
+def _attach_result_fields(
+    score: dict,
+    result: ValidatedAuditResult,
+) -> dict:
+    score["retry_used"] = result.retry_used
+    score["validation_errors"] = result.errors
+    score["response"] = result.response or ""
+    score["first_response"] = result.first_response
+    score["first_validation_errors"] = list(
+        result.first_validation_errors
+    )
+    score["retry_response"] = result.retry_response
+    score["retry_validation_errors"] = list(
+        result.retry_validation_errors
+    )
+    return score
+
+
+@dataclass(frozen=True)
+class ReplayReconstruction:
+    result: ValidatedAuditResult
+    needs_live_retry: bool
+    first_now_valid: bool
+    retry_now_valid: bool | None
+
+
+def reconstruct_replay_result(
+    captured: dict,
+    available_context_names: set[str] | None = None,
+) -> ReplayReconstruction:
+    first_response = captured.get("first_response") or ""
+    retry_response = captured.get("retry_response")
+    has_captured_retry = (
+        isinstance(retry_response, str)
+        and retry_response.strip() != ""
+    )
+
+    first_validation = validate_audit_output(
+        first_response,
+        available_context_names=available_context_names,
+    )
+    first_now_valid = first_validation.valid
+
+    retry_now_valid: bool | None = None
+    retry_validation_errors: list[str] = []
+    if has_captured_retry:
+        retry_validation = validate_audit_output(
+            retry_response,
+            available_context_names=available_context_names,
+        )
+        retry_now_valid = retry_validation.valid
+        retry_validation_errors = list(retry_validation.errors)
+
+    if first_now_valid:
+        result = ValidatedAuditResult(
+            success=True,
+            response=first_response.strip(),
+            errors=[],
+            retry_used=False,
+            first_response=first_response.strip(),
+            first_validation_errors=[],
+            retry_response=None,
+            retry_validation_errors=[],
+        )
+        return ReplayReconstruction(
+            result=result,
+            needs_live_retry=False,
+            first_now_valid=True,
+            retry_now_valid=retry_now_valid,
+        )
+
+    if has_captured_retry:
+        result = ValidatedAuditResult(
+            success=retry_now_valid is True,
+            response=retry_response.strip(),
+            errors=list(retry_validation_errors),
+            retry_used=True,
+            first_response=first_response.strip(),
+            first_validation_errors=list(
+                first_validation.errors
+            ),
+            retry_response=retry_response.strip(),
+            retry_validation_errors=list(
+                retry_validation_errors
+            ),
+        )
+        return ReplayReconstruction(
+            result=result,
+            needs_live_retry=False,
+            first_now_valid=False,
+            retry_now_valid=retry_now_valid,
+        )
+
+    result = ValidatedAuditResult(
+        success=False,
+        response=first_response.strip(),
+        errors=list(first_validation.errors),
+        retry_used=False,
+        first_response=first_response.strip(),
+        first_validation_errors=list(
+            first_validation.errors
+        ),
+        retry_response=None,
+        retry_validation_errors=[],
+    )
+    return ReplayReconstruction(
+        result=result,
+        needs_live_retry=True,
+        first_now_valid=False,
+        retry_now_valid=None,
+    )
+
+
+def replay_captured_case(
+    case: dict,
+    captured: dict,
+) -> dict:
+    prepared = prepare_evaluation_case(case)
+    reconstruction = reconstruct_replay_result(
+        captured,
+        available_context_names=set(
+            prepared["context_names"]
+        ),
+    )
+    score = score_evaluation_result(
+        case,
+        reconstruction.result,
+    )
+    _attach_result_fields(score, reconstruction.result)
+
+    original_audit_valid = captured.get("audit_valid")
+    original_passed = captured.get("passed")
+    original_retry_used = captured.get("retry_used")
+
+    score["needs_live_retry"] = reconstruction.needs_live_retry
+    score["original_audit_valid"] = original_audit_valid
+    score["original_passed"] = original_passed
+    score["original_retry_used"] = original_retry_used
+    score["first_now_valid"] = reconstruction.first_now_valid
+    score["retry_now_valid"] = reconstruction.retry_now_valid
+    score["audit_valid_changed"] = (
+        score["audit_valid"] != original_audit_valid
+    )
+    score["passed_changed"] = (
+        score["passed"] != original_passed
+    )
+    score["retry_used_changed"] = (
+        score["retry_used"] != original_retry_used
+    )
+
+    if "run_index" in captured:
+        score["run_index"] = captured["run_index"]
+    if "seed" in captured:
+        score["seed"] = captured["seed"]
+
+    return score
+
+
+def summarize_replay_drift(scores: list[dict]) -> dict:
+    return {
+        "total_rows": len(scores),
+        "audit_valid_changed": sum(
+            1
+            for score in scores
+            if score.get("audit_valid_changed")
+        ),
+        "passed_changed": sum(
+            1
+            for score in scores
+            if score.get("passed_changed")
+        ),
+        "retry_used_changed": sum(
+            1
+            for score in scores
+            if score.get("retry_used_changed")
+        ),
+        "needs_live_retry": sum(
+            1
+            for score in scores
+            if score.get("needs_live_retry")
+        ),
+        "final_response_now_invalid": sum(
+            1
+            for score in scores
+            if score.get("audit_valid") is False
+        ),
+    }
+
+
+def replay_evaluation_report(
+    source_path: Path,
+    cases: list[dict] | None = None,
+) -> dict:
+    source = json.loads(
+        source_path.read_text(encoding="utf-8")
+    )
+    source_runs = source.get("runs")
+    if not isinstance(source_runs, list):
+        raise ValueError(
+            f"Replay source is missing runs: {source_path}"
+        )
+
+    selected_cases = (
+        load_evaluation_cases()
+        if cases is None
+        else cases
+    )
+    cases_by_id = {
+        case["id"]: case
+        for case in selected_cases
+    }
+
+    runs: list[dict] = []
+    all_scores: list[dict] = []
+
+    for source_run in source_runs:
+        captured_results = source_run.get("case_results")
+        if not isinstance(captured_results, list):
+            raise ValueError(
+                f"Replay source run is missing case_results: {source_path}"
+            )
+
+        annotated_scores: list[dict] = []
+        for captured in captured_results:
+            case_id = captured.get("case_id")
+            case = cases_by_id.get(case_id)
+            if case is None:
+                raise ValueError(
+                    f"Unknown replay case_id: {case_id}"
+                )
+
+            score = replay_captured_case(case, captured)
+            if "run_index" not in score:
+                score["run_index"] = source_run.get("run_index")
+            if "seed" not in score:
+                score["seed"] = source_run.get("seed")
+            annotated_scores.append(score)
+
+        all_scores.extend(annotated_scores)
+        run_summary = summarize_evaluation_scores(
+            annotated_scores
+        )
+        runs.append(
+            {
+                "run_index": source_run.get("run_index"),
+                "seed": source_run.get("seed"),
+                "summary": run_summary,
+                "case_results": annotated_scores,
+            }
+        )
+
+    source_metadata = source.get("metadata") or {}
+
+    return {
+        "metadata": {
+            "mode": "replay",
+            "source_path": str(source_path),
+            "model_called": False,
+            "model": source_metadata.get("model"),
+            "temperature": source_metadata.get("temperature"),
+            "num_ctx": source_metadata.get("num_ctx"),
+            "seeds": source_metadata.get("seeds"),
+            "run_count": source_metadata.get("run_count"),
+        },
+        "summary": summarize_evaluation_scores(all_scores),
+        "decision_summary": summarize_decision_scores(
+            all_scores
+        ),
+        "benchmark_gate": summarize_benchmark_gate(
+            all_scores
+        ),
+        "case_stability": summarize_case_stability(
+            all_scores
+        ),
+        "replay_drift": summarize_replay_drift(all_scores),
+        "runs": runs,
     }
 
 
@@ -596,7 +872,10 @@ def summarize_benchmark_gate(
     no_change_cases_correct = sum(
         1
         for summary in no_change_case_summaries
-        if summary["majority_decision"] == "NO_CHANGE"
+        if (
+            summary["majority_decision"] == "NO_CHANGE"
+            and summary["majority_count"] >= 2
+        )
     )
 
     context_case_summaries = [
@@ -764,18 +1043,7 @@ def run_evaluation_suite(
             model_call=model_call,
         )
         score = score_evaluation_result(case, result)
-
-        score["retry_used"] = result.retry_used
-        score["validation_errors"] = result.errors
-        score["response"] = result.response or ""
-        score["first_response"] = result.first_response
-        score["first_validation_errors"] = list(
-            result.first_validation_errors
-        )
-        score["retry_response"] = result.retry_response
-        score["retry_validation_errors"] = list(
-            result.retry_validation_errors
-        )
+        _attach_result_fields(score, result)
         scores.append(score)
 
     summary = summarize_evaluation_scores(scores)
@@ -826,7 +1094,7 @@ def parse_cli_args(
     parser.add_argument(
         "--num-ctx",
         type=int,
-        default=4096,
+        default=8192,
     )
     parser.add_argument(
         "--seeds",
@@ -839,11 +1107,92 @@ def parse_cli_args(
         type=Path,
         required=True,
     )
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--replay-json",
+        type=Path,
+        default=None,
+        help="Re-validate a captured evaluation JSON without calling Ollama.",
+    )
+    args = parser.parse_args(argv)
+    if args.replay_json is not None and args.seeds is not None:
+        parser.error(
+            "--replay-json cannot be combined with --seeds."
+        )
+    return args
+
+
+def _write_evaluation_report(
+    output: Path,
+    report: dict,
+) -> None:
+    output.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    output.write_text(
+        json.dumps(
+            report,
+            indent=2,
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _print_evaluation_summary(
+    summary: dict,
+    benchmark_gate: dict,
+    output: Path,
+) -> None:
+    print(
+        "Evaluation completed: "
+        f"{summary['passed']}/{summary['total']} passed"
+    )
+    gate_status = (
+        "PASS" if benchmark_gate["passed"] else "FAIL"
+    )
+    print(
+        f"Benchmark gate: {gate_status} | "
+        f"majority {benchmark_gate['majority_correct_cases']}/"
+        f"{benchmark_gate['minimum_majority_correct_cases']}, "
+        f"change {benchmark_gate['change_cases_correct']}/"
+        f"{benchmark_gate['required_change_cases_correct']}, "
+        f"no_change {benchmark_gate['no_change_cases_correct']}/"
+        f"{benchmark_gate['required_no_change_cases_correct']}, "
+        f"context {benchmark_gate['context_cases_correct']}/"
+        f"{benchmark_gate['required_context_cases_correct']}, "
+        f"hcfp {benchmark_gate['high_confidence_false_positive_count']}, "
+        f"structural "
+        f"{benchmark_gate['structural_validation_rate']:.2f}"
+    )
+    print(f"Results written to: {output}")
+
+
+def run_replay_cli(args: argparse.Namespace) -> int:
+    report = replay_evaluation_report(args.replay_json)
+    _write_evaluation_report(args.output, report)
+    _print_evaluation_summary(
+        report["summary"],
+        report["benchmark_gate"],
+        args.output,
+    )
+    drift = report["replay_drift"]
+    print(
+        "Replay drift: "
+        f"audit_valid_changed {drift['audit_valid_changed']}, "
+        f"passed_changed {drift['passed_changed']}, "
+        f"needs_live_retry {drift['needs_live_retry']}, "
+        f"final_invalid {drift['final_response_now_invalid']}"
+    )
+    return 0
 
 
 def run_cli(argv: list[str] | None = None) -> int:
     args = parse_cli_args(argv)
+    if args.replay_json is not None:
+        return run_replay_cli(args)
+
     seeds = (
         args.seeds
         if args.seeds is not None
@@ -915,25 +1264,12 @@ def run_cli(argv: list[str] | None = None) -> int:
         "runs": runs,
     }
 
-    args.output.parent.mkdir(
-        parents=True,
-        exist_ok=True,
+    _write_evaluation_report(args.output, report)
+    _print_evaluation_summary(
+        summary,
+        benchmark_gate,
+        args.output,
     )
-    args.output.write_text(
-        json.dumps(
-            report,
-            indent=2,
-            ensure_ascii=False,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    print(
-        "Evaluation completed: "
-        f"{summary['passed']}/{summary['total']} passed"
-    )
-    print(f"Results written to: {args.output}")
 
     return 0
 

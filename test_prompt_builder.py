@@ -1,4 +1,31 @@
-from prompt_builder import build_file_audit_prompt
+from prompt_builder import build_file_audit_prompt, build_system_prompt
+
+
+def test_system_prompt_recommends_focused_audit_commands(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "prompt_builder.format_memories_for_prompt",
+        lambda: "",
+    )
+    monkeypatch.setattr(
+        "prompt_builder.build_project_summary",
+        lambda root: "",
+    )
+
+    prompt = build_system_prompt("what should I improve next?")
+
+    assert "/audit_lines" in prompt
+    assert "/audit_function" in prompt
+    assert "/audit_method" in prompt
+    assert (
+        "the recommended next capability should be: /audit_file <path>"
+        not in prompt
+    )
+    assert (
+        "/audit_file is legacy; do not recommend it as the next capability"
+        in prompt
+    )
 
 
 def test_file_audit_prompt_includes_usefulness_rules():
@@ -140,6 +167,15 @@ def test_file_audit_prompt_includes_finding_discipline():
     assert 'Use "consider adding only if existing tests do not cover this"' in prompt
     assert "If imported constants or helpers are not visible" in prompt
     assert "Prefer INSPECT_CONTEXT" in prompt
+    assert "Evidence boundary:" in prompt
+    assert "Distinguish an observable exception path from a visible contract violation." in prompt
+    assert "A visible contract is a type hint, docstring, or named guarantee" in prompt
+    assert "thin conversion, parse, or lookup" in prompt
+    assert "name the missing caller or schema" in prompt
+    assert "Do not treat \"this can raise if the caller passes X\"" in prompt
+    assert "Do not recommend INSPECT_CONTEXT when a visible contract is already violated" in prompt
+    assert "reachable exception whose allowed inputs and error policy are not established" in prompt
+    assert "for a crash or exception, that visible code also establishes a contract" in prompt
     assert 'Use the exact labels "Classification:", "Evidence:", "Why:", and "Missing context:"' in prompt
     assert 'Use the exact labels "Recommended action:", "Test status:", and "Reason:"' in prompt
     assert 'Do not use "Action:" or "Test:"' in prompt
